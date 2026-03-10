@@ -45,7 +45,8 @@ git commit -m "describe change"
 git push
 
 
-#Commands
+# Commands
+
 git clone URL        # download repo first time
 
 git pull             # download newest changes
