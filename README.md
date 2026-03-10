@@ -26,6 +26,7 @@ Every time you work on the project:
 git pull
 
 This downloads changes your teammates made.
+
 2️⃣ Make your changes
 
 Edit files normally.
