@@ -14,7 +14,7 @@ Done.
 ## Option B — Using Git (terminal)
 Install Git
 Run:
-git clone https://github.com/username/group-project.git
+git clone https://github.com/gylom/gruppe-eksamen.git
 
 ### This downloads the project folder.
 
@@ -47,7 +47,7 @@ git push
 
 # Commands
 
-git clone URL        # download repo first time
+git clone https://github.com/gylom/gruppe-eksamen.git        # download repo first time
 
 git pull             # download newest changes
 
