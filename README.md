@@ -42,6 +42,13 @@ Edit files normally.
 
 git add .
 
+(git add .) adds all files to be changed/pushed
+
+(git add program.cs) only adds program.cs file to be changed/pushed
+
+(git add folder-name/) = all files in folder for example (git add backend/  )
+
+
 4️⃣ Commit your changes
 
 git commit -m "Added login feature"
@@ -57,6 +64,12 @@ git pull
 
 git add .
 
+(git add .) adds all files to be changed/pushed
+
+(git add program.cs) only adds program.cs file to be changed/pushed
+
+(git add folder-name/) = all files in folder for example (git add backend/  )
+
 git commit -m "describe change"
 
 git push
@@ -68,7 +81,11 @@ git clone https://github.com/gylom/gruppe-eksamen.git        # download repo fir
 
 git pull             # download newest changes
 
-git add .            # stage changes
+git add .            # stage all changes in all files
+
+git add program.cs            # stage all changes in file program.cs
+
+git add backend/            # stage all changes in backend folder
 
 git commit -m "msg"  # save change
 
