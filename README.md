@@ -2,7 +2,7 @@
 Eksamen Gokstad Akademiet
 
 ## Each member must clone the repo once.
-Option A — Using GitHub Desktop (Easiest)
+Option A — Using GitHub Desktop 
 Download GitHub Desktop
 Steps:
 File → Clone repository
@@ -11,7 +11,7 @@ Select a folder
 Click Clone
 Done.
 
-##Option B — Using Git (terminal)
+## Option B — Using Git (terminal)
 Install Git
 Run:
 git clone https://github.com/username/group-project.git
@@ -22,6 +22,7 @@ git clone https://github.com/username/group-project.git
 Every time you work on the project:
 1️⃣ Get the latest files
 git pull
+
 This downloads changes your teammates made.
 2️⃣ Make your changes
 Edit files normally.
@@ -33,16 +34,24 @@ git commit -m "Added login feature"
 git push
 
 # Daily Workflow
+
 git pull
 (make changes)
+
 git add .
+
 git commit -m "describe change"
+
 git push
 
 
 #Commands
 git clone URL        # download repo first time
+
 git pull             # download newest changes
+
 git add .            # stage changes
+
 git commit -m "msg"  # save change
+
 git push             # upload to GitHub
