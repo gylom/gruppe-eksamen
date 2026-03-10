@@ -20,17 +20,26 @@ git clone https://github.com/gylom/gruppe-eksamen.git
 
 # Basic Workflow (Very Important)
 Every time you work on the project:
+
 1️⃣ Get the latest files
+
 git pull
 
 This downloads changes your teammates made.
 2️⃣ Make your changes
+
 Edit files normally.
+
 3️⃣ Add files to commit
+
 git add .
+
 4️⃣ Commit your changes
+
 git commit -m "Added login feature"
+
 5️⃣ Upload to GitHub
+
 git push
 
 # Daily Workflow
