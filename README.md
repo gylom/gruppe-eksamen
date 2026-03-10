@@ -11,7 +11,12 @@ Select a folder
 Click Clone
 Done.
 
-## Option B — Using Git (terminal)
+<img width="762" height="100" alt="image" src="https://github.com/user-attachments/assets/2ce95079-c524-4c52-a5ab-248a49855842" />
+<img width="795" height="255" alt="image" src="https://github.com/user-attachments/assets/a1de5e4d-e0f3-4d21-bd1e-24ed366639fa" />
+
+
+
+## Option B — Using Git in for example JetBrains Rider terminal
 Install Git
 Run:
 git clone https://github.com/gylom/gruppe-eksamen.git
