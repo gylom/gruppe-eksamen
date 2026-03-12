@@ -90,3 +90,6 @@ git add backend/            # stage all changes in backend folder
 git commit -m "msg"  # save change
 
 git push             # upload to GitHub
+
+
+git status     # check if all OK, nothing red.
