@@ -1,0 +1,18 @@
+{
+  "name": "gruppe-eksamen-root",
+  "private": true,
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:reset:win": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-db.ps1",
+    "db:reset:linux": "bash ./scripts/setup-db.sh",
+    "backend": "cd backend && dotnet run",
+    "frontend": "cd client-react && npm run dev",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "start:win": "npm run db:reset:win && npm run dev",
+    "start:linux": "npm run db:reset:linux && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}

@@ -1,6 +1,20 @@
 # gruppe-eksamen
 Eksamen Gokstad Akademiet
 
+
+# Quick start
+
+## Requirements
+- Docker Desktop
+- .NET SDK
+- Node.js + npm
+
+## Windows
+```bash
+npm install
+npm run start:win
+```
+
 ## Each member must clone the repo once.
 Option A — Using GitHub Desktop 
 Download GitHub Desktop
