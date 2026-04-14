@@ -1,26 +1,23 @@
-INSERT INTO Ingredienser 
-(oppskrift_id, varetype_id, kvantitet, maaleenhet_id, type, valgfritt) VALUES
+INSERT INTO Ingredienser
+(id, oppskrift_id, varetype_id, kvantitet, maaleenhet_id, type, valgfritt)
+VALUES
+    (1, 1, 12, 0.50, 2, 'ingredient', 0),
+    (2, 1, 15, 0.50, 3, 'ingredient', 0),
+    (3, 1, 7, 0.40, 2, 'ingredient', 0),
 
--- Spaghetti Bolognese (1)
-(1, 10, 400, 0, 'ingredient', FALSE), -- kjøttdeig
-(1, 36, 1, 3, 'ingredient', FALSE),   -- pastasaus
-(1, 34, 200, 0, 'ingredient', FALSE), -- pasta
+    (4, 2, 8, 0.60, 2, 'ingredient', 0),
+    (5, 2, 14, 1.00, 2, 'ingredient', 0),
+    (6, 2, 33, 0.30, 2, 'tilbehor', 1),
 
--- Kylling og ris (2)
-(2, 12, 400, 0, 'ingredient', FALSE), -- kylling
-(2, 37, 200, 0, 'ingredient', FALSE), -- ris
+    (7, 3, 9, 0.50, 2, 'ingredient', 0),
+    (8, 3, 33, 0.40, 2, 'ingredient', 0),
 
--- Laks med grønnsaker (3)
-(3, 14, 400, 0, 'ingredient', FALSE), -- laks
-(3, 7, 200, 0, 'ingredient', FALSE),  -- grønnsaker
+    (9, 4, 10, 4.00, 4, 'ingredient', 0),
+    (10, 4, 2, 0.20, 2, 'tilbehor', 1),
 
--- Omelett (4)
-(4, 25, 3, 4, 'ingredient', FALSE),   -- egg
+    (11, 5, 4, 0.50, 3, 'ingredient', 0),
+    (12, 5, 27, 0.20, 2, 'tilbehor', 1),
 
--- Yoghurt med bær (5)
-(5, 21, 200, 0, 'ingredient', FALSE), -- yoghurt
-(5, 1, 100, 0, 'ingredient', FALSE),  -- bær
-
--- Pasta med ostesaus (6) (Ola sin)
-(6, 34, 200, 0, 'ingredient', FALSE), -- pasta
-(6, 22, 150, 0, 'ingredient', FALSE); -- ost
+    (13, 6, 13, 0.50, 2, 'ingredient', 0),
+    (14, 6, 2, 0.20, 2, 'ingredient', 0),
+    (15, 6, 15, 0.30, 3, 'tilbehor', 1);

@@ -1,6 +1,6 @@
 INSERT INTO Maaleenheter (id, enhet, type) VALUES
-(0, 'gram', 'vekt'),
-(1, 'kg', 'vekt'),
-(2, 'liter', 'volum'),
-(3, 'dl', 'volum'),
-(4, 'stk', 'antall');
+                                               (1, 'gram', 'vekt'),
+                                               (2, 'kg', 'vekt'),
+                                               (3, 'liter', 'volum'),
+                                               (4, 'stk', 'antall'),
+                                               (5, 'dl', 'volum');

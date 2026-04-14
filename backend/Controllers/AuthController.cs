@@ -15,76 +15,103 @@ namespace DefaultNamespace.Controllers;
 [Route("api/auth")]
 public class AuthController : ControllerBase
 {
-    private readonly UserManager<User> _userManager;
     private readonly AppDbContext _db;
+    private readonly IPasswordHasher<Bruker> _passwordHasher;
     private readonly IConfiguration _configuration;
 
-    public AuthController(UserManager<User> userManager, AppDbContext db, IConfiguration configuration)
+    public AuthController(AppDbContext db, IPasswordHasher<Bruker> passwordHasher, IConfiguration configuration)
     {
-        _userManager = userManager;
         _db = db;
+        _passwordHasher = passwordHasher;
         _configuration = configuration;
     }
 
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterRequest request)
     {
-        if (await _userManager.FindByEmailAsync(request.Email) != null)
-            return BadRequest(new { message = "Email already in use." });
+        if (string.IsNullOrWhiteSpace(request.Brukernavn) || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Passord))
+            return BadRequest(new { message = "Brukernavn, email og passord er påkrevd." });
 
-        int? householdId = request.HouseholdId;
+        if (await _db.Brukere.AnyAsync(x => x.Brukernavn == request.Brukernavn))
+            return BadRequest(new { message = "Brukernavn er allerede i bruk." });
 
-        if (householdId == null && !string.IsNullOrWhiteSpace(request.HouseholdName))
+        if (await _db.Brukere.AnyAsync(x => x.Email == request.Email))
+            return BadRequest(new { message = "Email er allerede i bruk." });
+
+        await using var tx = await _db.Database.BeginTransactionAsync();
+
+        var bruker = new Bruker
         {
-            var household = new Household { Name = request.HouseholdName.Trim() };
-            _db.Households.Add(household);
+            Brukernavn = request.Brukernavn.Trim(),
+            Email = request.Email.Trim(),
+            Rolle = false,
+            CreatedAt = DateTime.UtcNow
+        };
+        bruker.PassordHash = _passwordHasher.HashPassword(bruker, request.Passord);
+
+        _db.Brukere.Add(bruker);
+        await _db.SaveChangesAsync();
+
+        ulong? householdId = null;
+        string householdName = string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(request.HouseholdName))
+        {
+            var husholdning = new Husholdning
+            {
+                Navn = request.HouseholdName.Trim(),
+                CreatedAt = DateTime.UtcNow
+            };
+            _db.Husholdninger.Add(husholdning);
             await _db.SaveChangesAsync();
-            householdId = household.Id;
+
+            _db.Medlemmer.Add(new Medlem
+            {
+                HusholdningId = husholdning.Id,
+                UserId = bruker.Id,
+                Rolle = "eier"
+            });
+            await _db.SaveChangesAsync();
+
+            householdId = husholdning.Id;
+            householdName = husholdning.Navn;
         }
 
-        var user = new User
-        {
-            UserName = request.Email,
-            Email = request.Email,
-            FullName = request.FullName,
-            EmailConfirmed = true,
-            HouseholdId = householdId
-        };
-
-        var result = await _userManager.CreateAsync(user, request.Password);
-        if (!result.Succeeded)
-            return BadRequest(result.Errors);
-
-        await _userManager.AddToRoleAsync(user, "User");
-
-        return Ok(BuildAuthResponse(user));
+        await tx.CommitAsync();
+        return Ok(BuildAuthResponse(bruker, householdId, householdName));
     }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginRequest request)
     {
-        var user = await _userManager.Users.FirstOrDefaultAsync(x => x.Email == request.Email);
-        if (user == null)
-            return Unauthorized(new { message = "Invalid email or password." });
+        var identifier = request.BrukernavnEllerEmail.Trim();
+        var bruker = await _db.Brukere.FirstOrDefaultAsync(x => x.Brukernavn == identifier || x.Email == identifier);
+        if (bruker == null)
+            return Unauthorized(new { message = "Ugyldig brukernavn/email eller passord." });
 
-        var valid = await _userManager.CheckPasswordAsync(user, request.Password);
-        if (!valid)
-            return Unauthorized(new { message = "Invalid email or password." });
+        var verify = _passwordHasher.VerifyHashedPassword(bruker, bruker.PassordHash, request.Passord);
+        if (verify == PasswordVerificationResult.Failed)
+            return Unauthorized(new { message = "Ugyldig brukernavn/email eller passord." });
 
-        return Ok(BuildAuthResponse(user));
+        var membership = await _db.Medlemmer
+            .Include(x => x.Husholdning)
+            .FirstOrDefaultAsync(x => x.UserId == bruker.Id);
+
+        return Ok(BuildAuthResponse(bruker, membership?.HusholdningId, membership?.Husholdning?.Navn ?? string.Empty));
     }
 
-    private AuthResponse BuildAuthResponse(User user)
+    private AuthResponse BuildAuthResponse(Bruker bruker, ulong? householdId, string householdName)
     {
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, user.Id),
-            new(ClaimTypes.Name, user.FullName ?? user.Email ?? ""),
-            new(ClaimTypes.Email, user.Email ?? "")
+            new(ClaimTypes.NameIdentifier, bruker.Id.ToString()),
+            new(ClaimTypes.Name, bruker.Brukernavn),
+            new(ClaimTypes.Email, bruker.Email),
+            new("rolle", bruker.Rolle ? "admin" : "user")
         };
 
-        if (user.HouseholdId.HasValue)
-            claims.Add(new Claim("householdId", user.HouseholdId.Value.ToString()));
+        if (householdId.HasValue)
+            claims.Add(new Claim("householdId", householdId.Value.ToString()));
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -94,16 +121,17 @@ public class AuthController : ControllerBase
             audience: _configuration["Jwt:Audience"],
             claims: claims,
             expires: DateTime.UtcNow.AddDays(7),
-            signingCredentials: creds
-        );
+            signingCredentials: creds);
 
         return new AuthResponse
         {
             Token = new JwtSecurityTokenHandler().WriteToken(token),
-            UserId = user.Id,
-            Email = user.Email ?? "",
-            HouseholdId = user.HouseholdId,
-            FullName = user.FullName
+            UserId = bruker.Id,
+            Brukernavn = bruker.Brukernavn,
+            Email = bruker.Email,
+            HouseholdId = householdId,
+            HouseholdName = householdName,
+            FullName = string.IsNullOrWhiteSpace(bruker.Brukernavn) ? bruker.Email : bruker.Brukernavn
         };
     }
 }

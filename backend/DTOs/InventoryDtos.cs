@@ -1,16 +1,36 @@
-﻿namespace DefaultNamespace.DTOs;
+namespace DefaultNamespace.DTOs;
 
-public class CreateInventoryItemRequest
+public class CreateInventoryRequest
 {
-    public long ProductId { get; set; }
-    public decimal Quantity { get; set; }
-    public long? MeasurementUnitId { get; set; }
-    public DateTime? ExpiryDate { get; set; }
+    public ulong VareId { get; set; }
+    public decimal Kvantitet { get; set; }
+    public decimal? Pris { get; set; }
+    public DateOnly? BestForDato { get; set; }
+    public DateTime? Kjopsdato { get; set; }
+    public ulong? PlasseringId { get; set; }
+    public ulong? MaaleenhetId { get; set; }
 }
 
-public class UpdateInventoryItemRequest
+public class UpdateInventoryRequest
 {
-    public decimal Quantity { get; set; }
-    public long? MeasurementUnitId { get; set; }
-    public DateTime? ExpiryDate { get; set; }
+    public decimal? Kvantitet { get; set; }
+    public decimal? Pris { get; set; }
+    public DateOnly? BestForDato { get; set; }
+    public DateTime? Kjopsdato { get; set; }
+    public ulong? PlasseringId { get; set; }
+    public ulong? MaaleenhetId { get; set; }
+    public decimal? Minimumslager { get; set; }
+    public bool? Beredskapslager { get; set; }
+}
+
+public class TakeFromInventoryRequest
+{
+    public decimal Kvantitet { get; set; }
+}
+
+public class UpsertHouseholdSettingRequest
+{
+    public ulong VaretypeId { get; set; }
+    public decimal? Minimumslager { get; set; }
+    public bool? Beredskapslager { get; set; }
 }

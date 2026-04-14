@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import "./App.css";
 
 const api = axios.create({
   baseURL: "http://localhost:5188/api"
@@ -9,30 +10,38 @@ export default function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [user, setUser] = useState(JSON.parse(localStorage.getItem("user") || "null"));
 
-  const [email, setEmail] = useState("test@test.no");
-  const [password, setPassword] = useState("Password123!");
-  const [fullName, setFullName] = useState("Test User");
-  const [householdName, setHouseholdName] = useState("Min Husholdning");
-
-  const [inventory, setInventory] = useState([]);
-  const [shoppingList, setShoppingList] = useState([]);
-  const [recipes, setRecipes] = useState([]);
+  const [brukernavn, setBrukernavn] = useState("gytis");
+  const [email, setEmail] = useState("gytis@test.no");
+  const [passord, setPassord] = useState("Test123!");
+  const [fullName, setFullName] = useState("Gytis");
+  const [householdName, setHouseholdName] = useState("Gytis sitt hjem");
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  const [products, setProducts] = useState([]);
+  const [productTypes, setProductTypes] = useState([]);
+  const [units, setUnits] = useState([]);
+  const [inventory, setInventory] = useState([]);
+  const [recipes, setRecipes] = useState([]);
+  const [recommendedRecipes, setRecommendedRecipes] = useState([]);
+
+  const [productSearch, setProductSearch] = useState("");
+  const [productTypeFilter, setProductTypeFilter] = useState("");
+
   const [inventoryForm, setInventoryForm] = useState({
     productId: "",
-    quantity: "",
+    quantity: "1",
     measurementUnitId: "",
-    expiryDate: ""
+    purchaseDate: "",
+    bestBeforeDate: "",
+    placementId: "1"
   });
 
-  const [shoppingForm, setShoppingForm] = useState({
+  const [settingsForm, setSettingsForm] = useState({
     productTypeId: "",
-    quantity: "",
-    measurementUnitId: "",
-    note: ""
+    minimumStock: "0",
+    isEmergencyStock: false
   });
 
   const [recipeForm, setRecipeForm] = useState({
@@ -41,13 +50,20 @@ export default function App() {
     servings: 1,
     imageUrl: "",
     ingredients: [
-      { productTypeId: "", quantity: "", measurementUnitId: "", type: "ingredient", optional: false }
+      {
+        productTypeId: "",
+        quantity: "1",
+        measurementUnitId: "",
+        type: "ingredient",
+        optional: false
+      }
     ]
   });
 
-  const authHeaders = token
-      ? { Authorization: `Bearer ${token}` }
-      : {};
+  const authHeaders = useMemo(() => {
+    if (!token) return {};
+    return { Authorization: `Bearer ${token}` };
+  }, [token]);
 
   function showMessage(text) {
     setMessage(text);
@@ -57,52 +73,6 @@ export default function App() {
   function showError(text) {
     setError(text);
     setMessage("");
-  }
-
-  async function register() {
-    try {
-      setMessage("");
-      setError("");
-
-      const res = await api.post("/auth/register", {
-        email,
-        password,
-        fullName,
-        householdName
-      });
-
-      saveAuth(res.data);
-      showMessage("✅ User registered successfully!");
-    } catch (err) {
-      console.error(err);
-      showError(
-          err.response?.data?.message ||
-          err.response?.data?.title ||
-          "❌ Registration failed"
-      );
-    }
-  }
-
-  async function login() {
-    try {
-      setMessage("");
-      setError("");
-
-      const res = await api.post("/auth/login", {
-        email,
-        password
-      });
-
-      saveAuth(res.data);
-      showMessage("✅ Login successful!");
-    } catch (err) {
-      console.error(err);
-      showError(
-          err.response?.data?.message ||
-          err.response?.data?.title ||
-          "❌ Invalid email or password"
-      );
-    }
   }
 
   function saveAuth(data) {
@@ -117,10 +87,79 @@ export default function App() {
     setUser(null);
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    setProducts([]);
+    setProductTypes([]);
+    setUnits([]);
     setInventory([]);
-    setShoppingList([]);
     setRecipes([]);
-    showMessage("✅ Logged out");
+    setRecommendedRecipes([]);
+    showMessage("Du er logget ut.");
+  }
+
+  async function register() {
+    try {
+      const res = await api.post("/auth/register", {
+        brukernavn,
+        email,
+        passord,
+        fullName,
+        householdName
+      });
+      saveAuth(res.data);
+      showMessage("Bruker registrert.");
+    } catch (err) {
+      console.error(err);
+      showError(err.response?.data?.message || "Registrering feilet.");
+    }
+  }
+
+  async function login() {
+    try {
+      const res = await api.post("/auth/login", {
+        brukernavnEllerEmail: email.trim() || brukernavn.trim(),
+        passord
+      });
+      saveAuth(res.data);
+      showMessage("Innlogging vellykket.");
+    } catch (err) {
+      console.error(err);
+      showError(err.response?.data?.message || "Innlogging feilet.");
+    }
+  }
+
+  async function loadUnits() {
+    try {
+      const res = await api.get("/maaleenheter", { headers: authHeaders });
+      setUnits(res.data);
+    } catch (err) {
+      console.error(err);
+      showError("Kunne ikke hente måleenheter.");
+    }
+  }
+
+  async function loadProductTypes() {
+    try {
+      const res = await api.get("/varetyper", { headers: authHeaders });
+      setProductTypes(res.data);
+    } catch (err) {
+      console.error(err);
+      showError("Kunne ikke hente varetyper.");
+    }
+  }
+
+  async function loadProducts() {
+    try {
+      const params = new URLSearchParams();
+      if (productSearch.trim()) params.append("sok", productSearch.trim());
+      if (productTypeFilter) params.append("varetypeId", productTypeFilter);
+
+      const url = params.toString() ? `/varer?${params.toString()}` : "/varer";
+      const res = await api.get(url, { headers: authHeaders });
+      setProducts(res.data);
+    } catch (err) {
+      console.error(err);
+      showError("Kunne ikke hente varer.");
+    }
   }
 
   async function loadInventory() {
@@ -129,90 +168,100 @@ export default function App() {
       setInventory(res.data);
     } catch (err) {
       console.error(err);
-      showError("❌ Failed to load inventory");
+      showError(err.response?.data?.message || "Kunne ikke hente varelager.");
     }
   }
 
-  async function addInventory() {
+  async function addInventoryItem() {
     try {
-      await api.post("/varelager", {
-        productId: Number(inventoryForm.productId),
-        quantity: Number(inventoryForm.quantity),
-        measurementUnitId: inventoryForm.measurementUnitId ? Number(inventoryForm.measurementUnitId) : null,
-        expiryDate: inventoryForm.expiryDate || null
-      }, { headers: authHeaders });
+      if (!inventoryForm.productId) {
+        showError("Velg et produkt først.");
+        return;
+      }
+
+      const payload = {
+        vareId: Number(inventoryForm.productId),
+        kvantitet: Number(inventoryForm.quantity),
+        maaleenhetId: inventoryForm.measurementUnitId
+            ? Number(inventoryForm.measurementUnitId)
+            : null,
+        kjopsdato: inventoryForm.purchaseDate
+            ? `${inventoryForm.purchaseDate}T00:00:00`
+            : null,
+        bestfordato: inventoryForm.bestBeforeDate || null,
+        plasseringId: inventoryForm.placementId
+            ? Number(inventoryForm.placementId)
+            : null
+      };
+
+      const res = await api.post("/varelager", payload, {
+        headers: authHeaders
+      });
+
+      console.log("POST /api/varelager response:", res.data);
 
       setInventoryForm({
         productId: "",
-        quantity: "",
+        quantity: "1",
         measurementUnitId: "",
-        expiryDate: ""
+        purchaseDate: "",
+        bestBeforeDate: "",
+        placementId: "1"
       });
 
-      showMessage("✅ Inventory item added");
-      loadInventory();
+      showMessage("Vare lagt til i varelager.");
+      await loadInventory();
+      await loadRecommendedRecipes();
     } catch (err) {
       console.error(err);
       showError(
           err.response?.data?.message ||
-          err.response?.data?.title ||
-          "❌ Failed to add inventory item"
+          JSON.stringify(err.response?.data) ||
+          "Kunne ikke legge til vare."
       );
     }
   }
 
-  async function loadShoppingList() {
+  async function takeFromInventory(itemId) {
+    const quantityTaken = prompt("Hvor mye vil du ta ut fra denne varen?", "1");
+    if (!quantityTaken) return;
+
     try {
-      const res = await api.get("/handleliste", { headers: authHeaders });
-      setShoppingList(res.data);
-    } catch (err) {
-      console.error(err);
-      showError("❌ Failed to load shopping list");
-    }
-  }
-
-  async function addShoppingItem() {
-    try {
-      await api.post("/handleliste", {
-        productTypeId: Number(shoppingForm.productTypeId),
-        quantity: Number(shoppingForm.quantity),
-        measurementUnitId: shoppingForm.measurementUnitId ? Number(shoppingForm.measurementUnitId) : null,
-        note: shoppingForm.note
-      }, { headers: authHeaders });
-
-      setShoppingForm({
-        productTypeId: "",
-        quantity: "",
-        measurementUnitId: "",
-        note: ""
-      });
-
-      showMessage("✅ Shopping list item added");
-      loadShoppingList();
-    } catch (err) {
-      console.error(err);
-      showError(
-          err.response?.data?.message ||
-          err.response?.data?.title ||
-          "❌ Failed to add shopping list item"
+      await api.post(
+          `/varelager/${itemId}/taut`,
+          { kvantitet: Number(quantityTaken) },
+          { headers: authHeaders }
       );
+      showMessage("Varelager oppdatert.");
+      await loadInventory();
+      await loadRecommendedRecipes();
+    } catch (err) {
+      console.error(err);
+      showError(err.response?.data?.message || "Kunne ikke ta ut vare.");
     }
   }
 
-  async function toggleShoppingItem(item) {
+  async function saveInventorySettings() {
     try {
-      await api.put(`/handleliste/${item.id}`, {
-        quantity: item.quantity,
-        measurementUnitId: null,
-        completed: !item.completed,
-        note: item.note
-      }, { headers: authHeaders });
+      if (!settingsForm.productTypeId) {
+        showError("Velg en varetype først.");
+        return;
+      }
 
-      showMessage("✅ Shopping list item updated");
-      loadShoppingList();
+      await api.post(
+          "/varelager/innstillinger",
+          {
+            varetypeId: Number(settingsForm.productTypeId),
+            minimumslager: Number(settingsForm.minimumStock),
+            beredskapslager: settingsForm.isEmergencyStock
+          },
+          { headers: authHeaders }
+      );
+      showMessage("Minimumslager og beredskapslager lagret.");
+      await loadInventory();
     } catch (err) {
       console.error(err);
-      showError("❌ Failed to update shopping list item");
+      showError(err.response?.data?.message || "Kunne ikke lagre innstillinger.");
     }
   }
 
@@ -222,14 +271,24 @@ export default function App() {
       setRecipes(res.data);
     } catch (err) {
       console.error(err);
-      showError("❌ Failed to load recipes");
+      showError("Kunne ikke hente oppskrifter.");
+    }
+  }
+
+  async function loadRecommendedRecipes() {
+    try {
+      const res = await api.get("/oppskrifteranbefalt", { headers: authHeaders });
+      setRecommendedRecipes(res.data);
+    } catch (err) {
+      console.error(err);
+      showError("Kunne ikke hente anbefalte oppskrifter.");
     }
   }
 
   function updateIngredient(index, field, value) {
-    const copy = [...recipeForm.ingredients];
-    copy[index] = { ...copy[index], [field]: value };
-    setRecipeForm({ ...recipeForm, ingredients: copy });
+    const ingredients = [...recipeForm.ingredients];
+    ingredients[index] = { ...ingredients[index], [field]: value };
+    setRecipeForm({ ...recipeForm, ingredients });
   }
 
   function addIngredientRow() {
@@ -237,26 +296,43 @@ export default function App() {
       ...recipeForm,
       ingredients: [
         ...recipeForm.ingredients,
-        { productTypeId: "", quantity: "", measurementUnitId: "", type: "ingredient", optional: false }
+        {
+          productTypeId: "",
+          quantity: "1",
+          measurementUnitId: "",
+          type: "ingredient",
+          optional: false
+        }
       ]
     });
   }
 
   async function createRecipe() {
     try {
-      await api.post("/oppskrifter", {
-        name: recipeForm.name,
-        instructions: recipeForm.instructions,
-        servings: Number(recipeForm.servings),
-        imageUrl: recipeForm.imageUrl,
-        ingredients: recipeForm.ingredients.map(x => ({
-          productTypeId: Number(x.productTypeId),
-          quantity: Number(x.quantity),
-          measurementUnitId: x.measurementUnitId ? Number(x.measurementUnitId) : null,
-          type: x.type,
-          optional: x.optional
-        }))
-      }, { headers: authHeaders });
+      if (!recipeForm.name.trim()) {
+        showError("Skriv inn navn på oppskriften.");
+        return;
+      }
+
+      const payload = {
+        navn: recipeForm.name,
+        instruksjoner: recipeForm.instructions,
+        porsjoner: Number(recipeForm.servings),
+        bilde: recipeForm.imageUrl || null,
+        ingredienser: recipeForm.ingredients
+            .filter((ingredient) => ingredient.productTypeId)
+            .map((ingredient) => ({
+              varetypeId: Number(ingredient.productTypeId),
+              kvantitet: Number(ingredient.quantity),
+              maaleenhetId: ingredient.measurementUnitId
+                  ? Number(ingredient.measurementUnitId)
+                  : null,
+              type: ingredient.type || "ingredient",
+              valgfritt: ingredient.optional
+            }))
+      };
+
+      await api.post("/oppskrifter", payload, { headers: authHeaders });
 
       setRecipeForm({
         name: "",
@@ -264,269 +340,450 @@ export default function App() {
         servings: 1,
         imageUrl: "",
         ingredients: [
-          { productTypeId: "", quantity: "", measurementUnitId: "", type: "ingredient", optional: false }
+          {
+            productTypeId: "",
+            quantity: "1",
+            measurementUnitId: "",
+            type: "ingredient",
+            optional: false
+          }
         ]
       });
 
-      showMessage("✅ Recipe created");
-      loadRecipes();
+      showMessage("Oppskrift opprettet.");
+      await loadRecipes();
+      await loadRecommendedRecipes();
     } catch (err) {
       console.error(err);
-      showError(
-          err.response?.data?.message ||
-          err.response?.data?.title ||
-          "❌ Failed to create recipe"
-      );
-    }
-  }
-
-  async function hideRecipe(id) {
-    try {
-      await api.post(`/oppskrifter/${id}/skjul`, {}, { headers: authHeaders });
-      showMessage("✅ Recipe hidden");
-      loadRecipes();
-    } catch (err) {
-      console.error(err);
-      showError("❌ Failed to hide recipe");
+      showError(err.response?.data?.message || "Kunne ikke opprette oppskrift.");
     }
   }
 
   useEffect(() => {
-    if (token) {
-      loadInventory();
-      loadShoppingList();
-      loadRecipes();
-    }
+    if (!token) return;
+    loadUnits();
+    loadProductTypes();
+    loadProducts();
+    loadInventory();
+    loadRecipes();
+    loadRecommendedRecipes();
   }, [token]);
 
   useEffect(() => {
-    if (message || error) {
-      const timer = setTimeout(() => {
-        setMessage("");
-        setError("");
-      }, 3000);
+    if (!token) return;
+    loadProducts();
+  }, [productSearch, productTypeFilter]);
 
-      return () => clearTimeout(timer);
-    }
+  useEffect(() => {
+    if (!message && !error) return;
+    const timer = setTimeout(() => {
+      setMessage("");
+      setError("");
+    }, 3000);
+    return () => clearTimeout(timer);
   }, [message, error]);
 
   return (
-      <div className="container">
-        <h1>Matlager App</h1>
+      <div className="page">
+        <header className="header">
+          <div>
+            <h1>Matlager / Beredskapslager</h1>
+            <p>React-klient oppdatert for SQL-schema backend.</p>
+          </div>
+          {token && (
+              <div className="userbox">
+                <strong>{user?.fullName || user?.brukernavn || user?.email}</strong>
+                <span>{user?.email}</span>
+                <button onClick={logout}>Logg ut</button>
+              </div>
+          )}
+        </header>
 
-        {message && (
-            <div
-                className="card"
-                style={{
-                  background: "#ecfdf3",
-                  border: "1px solid #86efac",
-                  color: "#166534"
-                }}
-            >
-              {message}
-            </div>
-        )}
-
-        {error && (
-            <div
-                className="card"
-                style={{
-                  background: "#fef2f2",
-                  border: "1px solid #fca5a5",
-                  color: "#991b1b"
-                }}
-            >
-              {error}
-            </div>
-        )}
+        {message && <div className="alert success">{message}</div>}
+        {error && <div className="alert error">{error}</div>}
 
         {!token ? (
-            <div className="card">
-              <h2>Login / Register</h2>
-
-              <div className="row">
-                <input
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="Email"
-                />
-                <input
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="Password"
-                    type="password"
-                />
-                <input
-                    value={fullName}
-                    onChange={e => setFullName(e.target.value)}
-                    placeholder="Full name"
-                />
-                <input
-                    value={householdName}
-                    onChange={e => setHouseholdName(e.target.value)}
-                    placeholder="Household name"
-                />
+            <section className="card">
+              <h2>Innlogging / registrering</h2>
+              <div className="grid two">
+                <label>
+                  Brukernavn
+                  <input value={brukernavn} onChange={(e) => setBrukernavn(e.target.value)} />
+                </label>
+                <label>
+                  E-post
+                  <input value={email} onChange={(e) => setEmail(e.target.value)} />
+                </label>
+                <label>
+                  Passord
+                  <input type="password" value={passord} onChange={(e) => setPassord(e.target.value)} />
+                </label>
+                <label>
+                  Fullt navn
+                  <input value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                </label>
+                <label>
+                  Husholdning
+                  <input value={householdName} onChange={(e) => setHouseholdName(e.target.value)} />
+                </label>
               </div>
-
-              <div className="row" style={{ marginTop: 12 }}>
-                <button onClick={register}>Register</button>
-                <button onClick={login}>Login</button>
+              <div className="actions">
+                <button onClick={register}>Registrer</button>
+                <button onClick={login}>Logg inn</button>
               </div>
-            </div>
+            </section>
         ) : (
             <>
-              <div className="card">
-                <strong>Logged in:</strong> {user?.fullName} ({user?.email})
-                <div style={{ marginTop: 10 }}>
-                  <button onClick={logout}>Logout</button>
-                </div>
-              </div>
-
-              <div className="card">
-                <h2>Varelager</h2>
-                <div className="row">
-                  <input
-                      placeholder="ProductId"
-                      value={inventoryForm.productId}
-                      onChange={e => setInventoryForm({ ...inventoryForm, productId: e.target.value })}
-                  />
-                  <input
-                      placeholder="Quantity"
-                      value={inventoryForm.quantity}
-                      onChange={e => setInventoryForm({ ...inventoryForm, quantity: e.target.value })}
-                  />
-                  <input
-                      placeholder="MeasurementUnitId"
-                      value={inventoryForm.measurementUnitId}
-                      onChange={e => setInventoryForm({ ...inventoryForm, measurementUnitId: e.target.value })}
-                  />
-                  <input
-                      type="date"
-                      value={inventoryForm.expiryDate}
-                      onChange={e => setInventoryForm({ ...inventoryForm, expiryDate: e.target.value })}
-                  />
-                  <button onClick={addInventory}>Add</button>
-                  <button onClick={loadInventory}>Refresh</button>
+              <section className="card">
+                <h2>1. Filterbare varer</h2>
+                <div className="grid three">
+                  <label>
+                    Søk
+                    <input
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                        placeholder="melk, pasta, ean..."
+                    />
+                  </label>
+                  <label>
+                    Varetype
+                    <select
+                        value={productTypeFilter}
+                        onChange={(e) => setProductTypeFilter(e.target.value)}
+                    >
+                      <option value="">Alle</option>
+                      {productTypes.map((type) => (
+                          <option key={type.id} value={type.id}>
+                            {type.varetype}
+                          </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="actions align-end">
+                    <button onClick={loadProducts}>Oppdater varer</button>
+                  </div>
                 </div>
 
-                <ul>
-                  {inventory.map(item => (
-                      <li key={item.id}>
-                        {item.productName} - {item.quantity} {item.unit || ""} - utløper:{" "}
-                        {item.expiryDate ? item.expiryDate.substring(0, 10) : "ikke satt"}
-                      </li>
-                  ))}
-                </ul>
-              </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                    <tr>
+                      <th>Id</th>
+                      <th>Navn</th>
+                      <th>Merke</th>
+                      <th>Varetype</th>
+                      <th>Kategori</th>
+                      <th>Pakning</th>
+                      <th>EAN</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {products.map((product) => (
+                        <tr key={product.id}>
+                          <td>{product.id}</td>
+                          <td>{product.varenavn}</td>
+                          <td>{product.merke || "-"}</td>
+                          <td>{product.varetype}</td>
+                          <td>{product.kategori || "-"}</td>
+                          <td>{product.kvantitet ? `${product.kvantitet} ${product.maaleenhet || ""}` : "-"}</td>
+                          <td>{product.ean || "-"}</td>
+                        </tr>
+                    ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
 
-              <div className="card">
-                <h2>Handleliste</h2>
-                <div className="row">
-                  <input
-                      placeholder="ProductTypeId"
-                      value={shoppingForm.productTypeId}
-                      onChange={e => setShoppingForm({ ...shoppingForm, productTypeId: e.target.value })}
-                  />
-                  <input
-                      placeholder="Quantity"
-                      value={shoppingForm.quantity}
-                      onChange={e => setShoppingForm({ ...shoppingForm, quantity: e.target.value })}
-                  />
-                  <input
-                      placeholder="MeasurementUnitId"
-                      value={shoppingForm.measurementUnitId}
-                      onChange={e => setShoppingForm({ ...shoppingForm, measurementUnitId: e.target.value })}
-                  />
-                  <input
-                      placeholder="Note"
-                      value={shoppingForm.note}
-                      onChange={e => setShoppingForm({ ...shoppingForm, note: e.target.value })}
-                  />
-                  <button onClick={addShoppingItem}>Add</button>
-                  <button onClick={loadShoppingList}>Refresh</button>
+              <section className="card">
+                <h2>2. Legg til vare i varelager</h2>
+                <div className="grid three">
+                  <label>
+                    Produkt
+                    <select
+                        value={inventoryForm.productId}
+                        onChange={(e) => setInventoryForm({ ...inventoryForm, productId: e.target.value })}
+                    >
+                      <option value="">Velg produkt</option>
+                      {products.map((product) => (
+                          <option key={product.id} value={product.id}>
+                            {product.varenavn} ({product.id})
+                          </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Mengde
+                    <input
+                        value={inventoryForm.quantity}
+                        onChange={(e) => setInventoryForm({ ...inventoryForm, quantity: e.target.value })}
+                    />
+                  </label>
+
+                  <label>
+                    Måleenhet
+                    <select
+                        value={inventoryForm.measurementUnitId}
+                        onChange={(e) => setInventoryForm({ ...inventoryForm, measurementUnitId: e.target.value })}
+                    >
+                      <option value="">Bruk valgt / standard</option>
+                      {units.map((unit) => (
+                          <option key={unit.id} value={unit.id}>
+                            {unit.enhet}
+                          </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Kjøpsdato
+                    <input
+                        type="date"
+                        value={inventoryForm.purchaseDate}
+                        onChange={(e) => setInventoryForm({ ...inventoryForm, purchaseDate: e.target.value })}
+                    />
+                  </label>
+
+                  <label>
+                    Best før
+                    <input
+                        type="date"
+                        value={inventoryForm.bestBeforeDate}
+                        onChange={(e) => setInventoryForm({ ...inventoryForm, bestBeforeDate: e.target.value })}
+                    />
+                  </label>
+
+                  <label>
+                    Plassering ID
+                    <input
+                        value={inventoryForm.placementId}
+                        onChange={(e) => setInventoryForm({ ...inventoryForm, placementId: e.target.value })}
+                        placeholder="For eksempel 1"
+                    />
+                  </label>
                 </div>
 
-                <ul>
-                  {shoppingList.map(item => (
-                      <li key={item.id}>
-                        {item.productTypeName} - {item.quantity} {item.unit || ""} -{" "}
-                        {item.completed ? "ferdig" : "ikke ferdig"}
-                        <button style={{ marginLeft: 8 }} onClick={() => toggleShoppingItem(item)}>
-                          Toggle done
-                        </button>
-                      </li>
-                  ))}
-                </ul>
-              </div>
+                <div className="actions">
+                  <button onClick={addInventoryItem}>Legg til i lager</button>
+                  <button onClick={loadInventory}>Oppdater varelager</button>
+                </div>
+              </section>
 
-              <div className="card">
-                <h2>Oppskrifter</h2>
-                <div className="row">
+              <section className="card">
+                <h2>3. Minimumslager og beredskapslager</h2>
+                <div className="grid three">
+                  <label>
+                    Varetype
+                    <select
+                        value={settingsForm.productTypeId}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, productTypeId: e.target.value })}
+                    >
+                      <option value="">Velg varetype</option>
+                      {productTypes.map((type) => (
+                          <option key={type.id} value={type.id}>
+                            {type.varetype}
+                          </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Minimumslager
+                    <input
+                        value={settingsForm.minimumStock}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, minimumStock: e.target.value })}
+                    />
+                  </label>
+
+                  <label className="checkbox-row">
+                    <span>Del av beredskapslager</span>
+                    <input
+                        type="checkbox"
+                        checked={settingsForm.isEmergencyStock}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, isEmergencyStock: e.target.checked })}
+                    />
+                  </label>
+                </div>
+                <div className="actions">
+                  <button onClick={saveInventorySettings}>Lagre innstillinger</button>
+                </div>
+              </section>
+
+              <section className="card">
+                <h2>4. Varelageroversikt</h2>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                    <tr>
+                      <th>Navn</th>
+                      <th>Varetype</th>
+                      <th>Total mengde</th>
+                      <th>Minimum</th>
+                      <th>Beredskap</th>
+                      <th>Plasseringer</th>
+                      <th>Ta ut</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {inventory.map((row, index) => (
+                        <tr key={`${row.varetype_id}-${index}`}>
+                          <td>{row.varenavn}</td>
+                          <td>{row.varetype}</td>
+                          <td>{row.total_kvantitet} {row.maaleenhet || ""}</td>
+                          <td>{row.minimumslager ?? 0}</td>
+                          <td>{row.beredskapslager ? "Ja" : "Nei"}</td>
+                          <td>{row.plasseringer?.length ? row.plasseringer.join(", ") : "-"}</td>
+                          <td>
+                            {row.varer?.length > 0 ? (
+                                <div className="stack">
+                                  {row.varer.map((item) => (
+                                      <button key={item.id} onClick={() => takeFromInventory(item.id)}>
+                                        Ta ut fra id {item.id}
+                                      </button>
+                                  ))}
+                                </div>
+                            ) : (
+                                <span>-</span>
+                            )}
+                          </td>
+                        </tr>
+                    ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section className="card">
+                <h2>5. Oppskrifter</h2>
+                <div className="grid two">
+                  <label>
+                    Navn
+                    <input
+                        value={recipeForm.name}
+                        onChange={(e) => setRecipeForm({ ...recipeForm, name: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Porsjoner
+                    <input
+                        value={recipeForm.servings}
+                        onChange={(e) => setRecipeForm({ ...recipeForm, servings: e.target.value })}
+                    />
+                  </label>
+                </div>
+
+                <label>
+                  Bilde-URL
                   <input
-                      placeholder="Name"
-                      value={recipeForm.name}
-                      onChange={e => setRecipeForm({ ...recipeForm, name: e.target.value })}
-                  />
-                  <input
-                      placeholder="Servings"
-                      value={recipeForm.servings}
-                      onChange={e => setRecipeForm({ ...recipeForm, servings: e.target.value })}
-                  />
-                  <input
-                      placeholder="Image URL"
                       value={recipeForm.imageUrl}
-                      onChange={e => setRecipeForm({ ...recipeForm, imageUrl: e.target.value })}
+                      onChange={(e) => setRecipeForm({ ...recipeForm, imageUrl: e.target.value })}
                   />
-                </div>
+                </label>
 
-                <div style={{ marginTop: 12 }}>
-              <textarea
-                  rows="4"
-                  style={{ width: "100%" }}
-                  placeholder="Instructions"
-                  value={recipeForm.instructions}
-                  onChange={e => setRecipeForm({ ...recipeForm, instructions: e.target.value })}
-              />
-                </div>
+                <label>
+                  Instruksjoner
+                  <textarea
+                      rows="5"
+                      value={recipeForm.instructions}
+                      onChange={(e) => setRecipeForm({ ...recipeForm, instructions: e.target.value })}
+                  />
+                </label>
 
-                <h4>Ingredients</h4>
-                {recipeForm.ingredients.map((ing, index) => (
-                    <div className="row" key={index} style={{ marginBottom: 8 }}>
-                      <input
-                          placeholder="ProductTypeId"
-                          value={ing.productTypeId}
-                          onChange={e => updateIngredient(index, "productTypeId", e.target.value)}
-                      />
-                      <input
-                          placeholder="Quantity"
-                          value={ing.quantity}
-                          onChange={e => updateIngredient(index, "quantity", e.target.value)}
-                      />
-                      <input
-                          placeholder="MeasurementUnitId"
-                          value={ing.measurementUnitId}
-                          onChange={e => updateIngredient(index, "measurementUnitId", e.target.value)}
-                      />
+                <h3>Ingredienser</h3>
+                {recipeForm.ingredients.map((ingredient, index) => (
+                    <div className="grid four ingredient-row" key={index}>
+                      <label>
+                        Varetype
+                        <select
+                            value={ingredient.productTypeId}
+                            onChange={(e) => updateIngredient(index, "productTypeId", e.target.value)}
+                        >
+                          <option value="">Velg varetype</option>
+                          {productTypes.map((type) => (
+                              <option key={type.id} value={type.id}>
+                                {type.varetype}
+                              </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label>
+                        Mengde
+                        <input
+                            value={ingredient.quantity}
+                            onChange={(e) => updateIngredient(index, "quantity", e.target.value)}
+                        />
+                      </label>
+
+                      <label>
+                        Måleenhet
+                        <select
+                            value={ingredient.measurementUnitId}
+                            onChange={(e) => updateIngredient(index, "measurementUnitId", e.target.value)}
+                        >
+                          <option value="">Ingen</option>
+                          {units.map((unit) => (
+                              <option key={unit.id} value={unit.id}>
+                                {unit.enhet}
+                              </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="checkbox-row">
+                        <span>Valgfri</span>
+                        <input
+                            type="checkbox"
+                            checked={ingredient.optional}
+                            onChange={(e) => updateIngredient(index, "optional", e.target.checked)}
+                        />
+                      </label>
                     </div>
                 ))}
 
-                <div className="row">
-                  <button onClick={addIngredientRow}>Add ingredient row</button>
-                  <button onClick={createRecipe}>Create recipe</button>
-                  <button onClick={loadRecipes}>Refresh</button>
+                <div className="actions">
+                  <button onClick={addIngredientRow}>Ny ingrediensrad</button>
+                  <button onClick={createRecipe}>Lagre oppskrift</button>
+                  <button onClick={loadRecipes}>Oppdater oppskrifter</button>
                 </div>
 
-                <ul>
-                  {recipes.map(recipe => (
-                      <li key={recipe.id}>
-                        <strong>{recipe.name}</strong> ({recipe.servings} porsjoner)
-                        <button style={{ marginLeft: 8 }} onClick={() => hideRecipe(recipe.id)}>
-                          Skjul
-                        </button>
-                      </li>
+                <div className="cards-grid">
+                  {recipes.map((recipe) => (
+                      <article className="mini-card" key={recipe.id}>
+                        <h3>{recipe.navn}</h3>
+                        <p>{recipe.porsjoner} porsjoner</p>
+                        <ul>
+                          {recipe.ingredienser?.map((ingredient) => (
+                              <li key={ingredient.id}>
+                                {ingredient.varetype} - {ingredient.kvantitet ?? 0} {ingredient.maaleenhet || ""}
+                              </li>
+                          ))}
+                        </ul>
+                      </article>
                   ))}
-                </ul>
-              </div>
+                </div>
+              </section>
+
+              <section className="card">
+                <h2>6. Anbefalte oppskrifter</h2>
+                <div className="cards-grid">
+                  {recommendedRecipes.map((recipe) => (
+                      <article className="mini-card" key={recipe.id}>
+                        <h3>{recipe.navn}</h3>
+                        <p>Match: {recipe.matchProsent}%</p>
+                        <p>Har {recipe.antallDuHar} av {recipe.antallIngredienser} ingredienser</p>
+                        <p>Mangler {recipe.antallDuMangler}</p>
+                        {recipe.manglendeIngredienser?.length > 0 && (
+                            <ul>
+                              {recipe.manglendeIngredienser.map((ingredient, index) => (
+                                  <li key={`${recipe.id}-${index}`}>{ingredient.varetype}</li>
+                              ))}
+                            </ul>
+                        )}
+                      </article>
+                  ))}
+                </div>
+              </section>
             </>
         )}
       </div>
