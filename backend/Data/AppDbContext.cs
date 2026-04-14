@@ -19,6 +19,8 @@ public class AppDbContext : DbContext
     public DbSet<Husholdningsinnstilling> Husholdningsinnstillinger => Set<Husholdningsinnstilling>();
     public DbSet<Plassering> Plasseringer => Set<Plassering>();
     public DbSet<VarelagerRad> Varelager => Set<VarelagerRad>();
+    public DbSet<HandlelisteRad> Handleliste => Set<HandlelisteRad>();
+    public DbSet<ForbrukRad> Forbruk => Set<ForbrukRad>();
     public DbSet<Oppskrift> Oppskrifter => Set<Oppskrift>();
     public DbSet<Ingrediens> Ingredienser => Set<Ingrediens>();
     public DbSet<Skjuloppskrift> Skjuloppskrifter => Set<Skjuloppskrift>();
@@ -35,6 +37,8 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Husholdningsinnstilling>().ToTable("Husholdningsinnstillinger");
         modelBuilder.Entity<Plassering>().ToTable("Plassering");
         modelBuilder.Entity<VarelagerRad>().ToTable("Varelager");
+        modelBuilder.Entity<HandlelisteRad>().ToTable("Handleliste");
+        modelBuilder.Entity<ForbrukRad>().ToTable("Forbruk");
         modelBuilder.Entity<Oppskrift>().ToTable("Oppskrifter");
         modelBuilder.Entity<Ingrediens>().ToTable("Ingredienser");
         modelBuilder.Entity<Skjuloppskrift>().ToTable("Skjuloppskrift");
@@ -100,6 +104,41 @@ public class AppDbContext : DbContext
             .HasForeignKey(x => x.PlasseringId);
 
         modelBuilder.Entity<VarelagerRad>()
+            .HasOne(x => x.Maaleenhet)
+            .WithMany()
+            .HasForeignKey(x => x.MaaleenhetId);
+
+        modelBuilder.Entity<HandlelisteRad>()
+            .HasOne(x => x.Varetype)
+            .WithMany()
+            .HasForeignKey(x => x.VaretypeId);
+
+        modelBuilder.Entity<HandlelisteRad>()
+            .HasOne(x => x.Vare)
+            .WithMany()
+            .HasForeignKey(x => x.VareId);
+
+        modelBuilder.Entity<HandlelisteRad>()
+            .HasOne(x => x.Bruker)
+            .WithMany()
+            .HasForeignKey(x => x.UserId);
+
+        modelBuilder.Entity<HandlelisteRad>()
+            .HasOne(x => x.Maaleenhet)
+            .WithMany()
+            .HasForeignKey(x => x.MaaleenhetId);
+
+        modelBuilder.Entity<ForbrukRad>()
+            .HasOne(x => x.Bruker)
+            .WithMany()
+            .HasForeignKey(x => x.UserId);
+
+        modelBuilder.Entity<ForbrukRad>()
+            .HasOne(x => x.Vare)
+            .WithMany()
+            .HasForeignKey(x => x.VareId);
+
+        modelBuilder.Entity<ForbrukRad>()
             .HasOne(x => x.Maaleenhet)
             .WithMany()
             .HasForeignKey(x => x.MaaleenhetId);
