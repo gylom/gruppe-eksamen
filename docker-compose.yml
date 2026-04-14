@@ -4,6 +4,7 @@ services:
   mysql:
     image: mysql:8
     container_name: matlager-mysql
+    restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: matlager_db
@@ -14,4 +15,4 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
       interval: 5s
       timeout: 5s
-      retries: 20
+      retries: 30

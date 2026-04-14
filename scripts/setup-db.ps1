@@ -1,22 +1,42 @@
-﻿$ErrorActionPreference = "Stop"
+﻿Write-Host "Removing old MySQL container if it exists..."
+try {
+    docker rm -f matlager-mysql | Out-Null
+} catch {}
 
-Write-Host "Starting MySQL with docker compose..."
+$ErrorActionPreference = "Stop"
+
+Write-Host "Starting MySQL container with docker compose..."
 docker compose up -d
 
-Write-Host "Waiting for MySQL to become ready..."
-$ready = $false
+Write-Host "Waiting for container to exist..."
+$containerReady = $false
 for ($i = 0; $i -lt 30; $i++) {
+    $containerId = docker ps -q -f "name=matlager-mysql"
+    if ($containerId) {
+        $containerReady = $true
+        break
+    }
+    Start-Sleep -Seconds 2
+}
+
+if (-not $containerReady) {
+    throw "matlager-mysql container did not start."
+}
+
+Write-Host "Waiting for MySQL to accept connections..."
+$mysqlReady = $false
+for ($i = 0; $i -lt 40; $i++) {
     try {
         docker exec matlager-mysql mysqladmin ping -h localhost -proot | Out-Null
         if ($LASTEXITCODE -eq 0) {
-            $ready = $true
+            $mysqlReady = $true
             break
         }
     } catch {}
     Start-Sleep -Seconds 2
 }
 
-if (-not $ready) {
+if (-not $mysqlReady) {
     throw "MySQL did not become ready in time."
 }
 
@@ -57,4 +77,3 @@ foreach ($file in $files) {
 }
 
 Write-Host "Database import completed."
-Write-Host "You can now run backend and frontend."

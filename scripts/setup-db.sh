@@ -1,11 +1,19 @@
 ﻿#!/usr/bin/env bash
 set -e
 
-echo "Starting MySQL with docker compose..."
+echo "Starting MySQL container with docker compose..."
 docker compose up -d
 
-echo "Waiting for MySQL to become ready..."
+echo "Waiting for container to exist..."
 for i in {1..30}; do
+  if docker ps -q -f "name=matlager-mysql" | grep -q .; then
+    break
+  fi
+  sleep 2
+done
+
+echo "Waiting for MySQL to accept connections..."
+for i in {1..40}; do
   if docker exec matlager-mysql mysqladmin ping -h localhost -proot >/dev/null 2>&1; then
     break
   fi
