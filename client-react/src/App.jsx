@@ -10,6 +10,9 @@ export default function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [user, setUser] = useState(JSON.parse(localStorage.getItem("user") || "null"));
 
+  const [authMode, setAuthMode] = useState("login");
+  const [loginIdentifier, setLoginIdentifier] = useState("gytis");
+
   const [brukernavn, setBrukernavn] = useState("gytis");
   const [email, setEmail] = useState("gytis@test.no");
   const [passord, setPassord] = useState("Test123!");
@@ -136,18 +139,28 @@ export default function App() {
     setShoppingSuggestions([]);
     setConsumptionRows([]);
 
+    setAuthMode("login");
+    setLoginIdentifier("");
+    setPassord("");
+
     showMessage("Du er logget ut.");
   }
 
   async function register() {
     try {
+      if (!brukernavn.trim() || !email.trim() || !passord.trim()) {
+        showError("Brukernavn, e-post og passord må fylles ut.");
+        return;
+      }
+
       const res = await api.post("/auth/register", {
-        brukernavn,
-        email,
-        passord,
-        fullName,
-        householdName
+        brukernavn: brukernavn.trim(),
+        email: email.trim(),
+        passord: passord.trim(),
+        fullName: fullName.trim(),
+        householdName: householdName.trim()
       });
+
       saveAuth(res.data);
       showMessage("Bruker registrert.");
     } catch (err) {
@@ -158,10 +171,16 @@ export default function App() {
 
   async function login() {
     try {
+      if (!loginIdentifier.trim() || !passord.trim()) {
+        showError("Skriv inn brukernavn eller e-post, og passord.");
+        return;
+      }
+
       const res = await api.post("/auth/login", {
-        brukernavnEllerEmail: email.trim() || brukernavn.trim(),
-        passord
+        brukernavnEllerEmail: loginIdentifier.trim(),
+        passord: passord.trim()
       });
+
       saveAuth(res.data);
       showMessage("Innlogging vellykket.");
     } catch (err) {
@@ -416,7 +435,9 @@ export default function App() {
 
       setInventoryForm((prev) => ({
         ...prev,
-        placementId: res.data.plasseringer?.[0]?.id ? String(res.data.plasseringer[0].id) : prev.placementId
+        placementId: res.data.plasseringer?.[0]?.id
+            ? String(res.data.plasseringer[0].id)
+            : prev.placementId
       }));
     } catch (err) {
       console.error(err);
@@ -751,33 +772,119 @@ export default function App() {
 
         {!token ? (
             <section className="card">
-              <h2>Innlogging / registrering</h2>
-              <div className="grid two">
-                <label>
-                  Brukernavn
-                  <input value={brukernavn} onChange={(e) => setBrukernavn(e.target.value)} />
-                </label>
-                <label>
-                  E-post
-                  <input value={email} onChange={(e) => setEmail(e.target.value)} />
-                </label>
-                <label>
-                  Passord
-                  <input type="password" value={passord} onChange={(e) => setPassord(e.target.value)} />
-                </label>
-                <label>
-                  Fullt navn
-                  <input value={fullName} onChange={(e) => setFullName(e.target.value)} />
-                </label>
-                <label>
-                  Husholdning
-                  <input value={householdName} onChange={(e) => setHouseholdName(e.target.value)} />
-                </label>
-              </div>
+              <h2>Velkommen</h2>
+
               <div className="actions">
-                <button onClick={register}>Registrer</button>
-                <button onClick={login}>Logg inn</button>
+                <button
+                    type="button"
+                    className={authMode === "login" ? "active" : ""}
+                    onClick={() => {
+                      setAuthMode("login");
+                      setMessage("");
+                      setError("");
+                    }}
+                >
+                  Logg inn
+                </button>
+                <button
+                    type="button"
+                    className={authMode === "register" ? "active" : ""}
+                    onClick={() => {
+                      setAuthMode("register");
+                      setMessage("");
+                      setError("");
+                    }}
+                >
+                  Registrer
+                </button>
               </div>
+
+              {authMode === "login" ? (
+                  <>
+                    <div className="grid two">
+                      <label>
+                        Brukernavn eller e-post
+                        <input
+                            value={loginIdentifier}
+                            onChange={(e) => setLoginIdentifier(e.target.value)}
+                            placeholder="Skriv brukernavn eller e-post"
+                        />
+                      </label>
+
+                      <label>
+                        Passord
+                        <input
+                            type="password"
+                            value={passord}
+                            onChange={(e) => setPassord(e.target.value)}
+                            placeholder="Skriv passord"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="actions">
+                      <button type="button" onClick={login}>
+                        Logg inn
+                      </button>
+                    </div>
+                  </>
+              ) : (
+                  <>
+                    <div className="grid two">
+                      <label>
+                        Brukernavn
+                        <input
+                            value={brukernavn}
+                            onChange={(e) => setBrukernavn(e.target.value)}
+                            placeholder="Velg brukernavn"
+                        />
+                      </label>
+
+                      <label>
+                        E-post
+                        <input
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="Skriv e-post"
+                        />
+                      </label>
+
+                      <label>
+                        Passord
+                        <input
+                            type="password"
+                            value={passord}
+                            onChange={(e) => setPassord(e.target.value)}
+                            placeholder="Velg passord"
+                        />
+                      </label>
+
+                      <label>
+                        Fullt navn
+                        <input
+                            value={fullName}
+                            onChange={(e) => setFullName(e.target.value)}
+                            placeholder="Skriv fullt navn"
+                        />
+                      </label>
+
+                      <label>
+                        Husholdning
+                        <input
+                            value={householdName}
+                            onChange={(e) => setHouseholdName(e.target.value)}
+                            placeholder="Navn på husholdning"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="actions">
+                      <button type="button" onClick={register}>
+                        Registrer
+                      </button>
+                    </div>
+                  </>
+              )}
             </section>
         ) : (
             <>
@@ -798,8 +905,12 @@ export default function App() {
                 </div>
 
                 <div className="mini-card">
-                  <p><strong>Aktiv husholdning:</strong> {household?.navn || "-"}</p>
-                  <p><strong>Min rolle:</strong> {household?.minRolle || "-"}</p>
+                  <p>
+                    <strong>Aktiv husholdning:</strong> {household?.navn || "-"}
+                  </p>
+                  <p>
+                    <strong>Min rolle:</strong> {household?.minRolle || "-"}
+                  </p>
                 </div>
               </section>
 
@@ -810,7 +921,12 @@ export default function App() {
                     Brukernavn eller e-post
                     <input
                         value={memberForm.brukernavnEllerEmail}
-                        onChange={(e) => setMemberForm({ ...memberForm, brukernavnEllerEmail: e.target.value })}
+                        onChange={(e) =>
+                            setMemberForm({
+                              ...memberForm,
+                              brukernavnEllerEmail: e.target.value
+                            })
+                        }
                     />
                   </label>
                   <label>
@@ -936,7 +1052,11 @@ export default function App() {
                           <td>{product.merke || "-"}</td>
                           <td>{product.varetype}</td>
                           <td>{product.kategori || "-"}</td>
-                          <td>{product.kvantitet ? `${product.kvantitet} ${product.maaleenhet || ""}` : "-"}</td>
+                          <td>
+                            {product.kvantitet
+                                ? `${product.kvantitet} ${product.maaleenhet || ""}`
+                                : "-"}
+                          </td>
                           <td>{product.ean || "-"}</td>
                         </tr>
                     ))}
@@ -952,7 +1072,9 @@ export default function App() {
                     Produkt
                     <select
                         value={inventoryForm.productId}
-                        onChange={(e) => setInventoryForm({ ...inventoryForm, productId: e.target.value })}
+                        onChange={(e) =>
+                            setInventoryForm({ ...inventoryForm, productId: e.target.value })
+                        }
                     >
                       <option value="">Velg produkt</option>
                       {products.map((product) => (
@@ -967,7 +1089,9 @@ export default function App() {
                     Mengde
                     <input
                         value={inventoryForm.quantity}
-                        onChange={(e) => setInventoryForm({ ...inventoryForm, quantity: e.target.value })}
+                        onChange={(e) =>
+                            setInventoryForm({ ...inventoryForm, quantity: e.target.value })
+                        }
                     />
                   </label>
 
@@ -975,7 +1099,12 @@ export default function App() {
                     Måleenhet
                     <select
                         value={inventoryForm.measurementUnitId}
-                        onChange={(e) => setInventoryForm({ ...inventoryForm, measurementUnitId: e.target.value })}
+                        onChange={(e) =>
+                            setInventoryForm({
+                              ...inventoryForm,
+                              measurementUnitId: e.target.value
+                            })
+                        }
                     >
                       <option value="">Bruk valgt / standard</option>
                       {units.map((unit) => (
@@ -991,7 +1120,9 @@ export default function App() {
                     <input
                         type="date"
                         value={inventoryForm.purchaseDate}
-                        onChange={(e) => setInventoryForm({ ...inventoryForm, purchaseDate: e.target.value })}
+                        onChange={(e) =>
+                            setInventoryForm({ ...inventoryForm, purchaseDate: e.target.value })
+                        }
                     />
                   </label>
 
@@ -1000,7 +1131,9 @@ export default function App() {
                     <input
                         type="date"
                         value={inventoryForm.bestBeforeDate}
-                        onChange={(e) => setInventoryForm({ ...inventoryForm, bestBeforeDate: e.target.value })}
+                        onChange={(e) =>
+                            setInventoryForm({ ...inventoryForm, bestBeforeDate: e.target.value })
+                        }
                     />
                   </label>
 
@@ -1008,7 +1141,9 @@ export default function App() {
                     Plassering
                     <select
                         value={inventoryForm.placementId}
-                        onChange={(e) => setInventoryForm({ ...inventoryForm, placementId: e.target.value })}
+                        onChange={(e) =>
+                            setInventoryForm({ ...inventoryForm, placementId: e.target.value })
+                        }
                     >
                       <option value="">Velg plassering</option>
                       {placements.map((placement) => (
@@ -1033,7 +1168,9 @@ export default function App() {
                     Varetype
                     <select
                         value={settingsForm.productTypeId}
-                        onChange={(e) => setSettingsForm({ ...settingsForm, productTypeId: e.target.value })}
+                        onChange={(e) =>
+                            setSettingsForm({ ...settingsForm, productTypeId: e.target.value })
+                        }
                     >
                       <option value="">Velg varetype</option>
                       {productTypes.map((type) => (
@@ -1048,7 +1185,9 @@ export default function App() {
                     Minimumslager
                     <input
                         value={settingsForm.minimumStock}
-                        onChange={(e) => setSettingsForm({ ...settingsForm, minimumStock: e.target.value })}
+                        onChange={(e) =>
+                            setSettingsForm({ ...settingsForm, minimumStock: e.target.value })
+                        }
                     />
                   </label>
 
@@ -1057,7 +1196,12 @@ export default function App() {
                     <input
                         type="checkbox"
                         checked={settingsForm.isEmergencyStock}
-                        onChange={(e) => setSettingsForm({ ...settingsForm, isEmergencyStock: e.target.checked })}
+                        onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              isEmergencyStock: e.target.checked
+                            })
+                        }
                     />
                   </label>
                 </div>
@@ -1086,7 +1230,9 @@ export default function App() {
                         <tr key={`${row.varetype_id}-${index}`}>
                           <td>{row.varenavn}</td>
                           <td>{row.varetype}</td>
-                          <td>{row.total_kvantitet} {row.maaleenhet || ""}</td>
+                          <td>
+                            {row.total_kvantitet} {row.maaleenhet || ""}
+                          </td>
                           <td>{row.minimumslager ?? 0}</td>
                           <td>{row.beredskapslager ? "Ja" : "Nei"}</td>
                           <td>{row.plasseringer?.length ? row.plasseringer.join(", ") : "-"}</td>
@@ -1117,7 +1263,9 @@ export default function App() {
                     Varetype
                     <select
                         value={shoppingForm.varetypeId}
-                        onChange={(e) => setShoppingForm({ ...shoppingForm, varetypeId: e.target.value })}
+                        onChange={(e) =>
+                            setShoppingForm({ ...shoppingForm, varetypeId: e.target.value })
+                        }
                     >
                       <option value="">Velg varetype</option>
                       {productTypes.map((type) => (
@@ -1132,7 +1280,9 @@ export default function App() {
                     Vare
                     <select
                         value={shoppingForm.vareId}
-                        onChange={(e) => setShoppingForm({ ...shoppingForm, vareId: e.target.value })}
+                        onChange={(e) =>
+                            setShoppingForm({ ...shoppingForm, vareId: e.target.value })
+                        }
                     >
                       <option value="">Valgfri konkret vare</option>
                       {products.map((product) => (
@@ -1147,7 +1297,9 @@ export default function App() {
                     Mengde
                     <input
                         value={shoppingForm.kvantitet}
-                        onChange={(e) => setShoppingForm({ ...shoppingForm, kvantitet: e.target.value })}
+                        onChange={(e) =>
+                            setShoppingForm({ ...shoppingForm, kvantitet: e.target.value })
+                        }
                     />
                   </label>
 
@@ -1155,7 +1307,9 @@ export default function App() {
                     Måleenhet
                     <select
                         value={shoppingForm.maaleenhetId}
-                        onChange={(e) => setShoppingForm({ ...shoppingForm, maaleenhetId: e.target.value })}
+                        onChange={(e) =>
+                            setShoppingForm({ ...shoppingForm, maaleenhetId: e.target.value })
+                        }
                     >
                       <option value="">Ingen</option>
                       {units.map((unit) => (
@@ -1209,7 +1363,9 @@ export default function App() {
                         <h3>{item.varetype}</h3>
                         <p>Forslag mengde: {item.forslagKvantitet}</p>
                         <p>{item.begrunnelse}</p>
-                        <button onClick={() => addSuggestionToShoppingList(item)}>Legg til forslag</button>
+                        <button onClick={() => addSuggestionToShoppingList(item)}>
+                          Legg til forslag
+                        </button>
                       </article>
                   ))}
                 </div>
@@ -1222,7 +1378,9 @@ export default function App() {
                     Fra varelager-rad
                     <select
                         value={consumptionForm.varelagerId}
-                        onChange={(e) => setConsumptionForm({ ...consumptionForm, varelagerId: e.target.value })}
+                        onChange={(e) =>
+                            setConsumptionForm({ ...consumptionForm, varelagerId: e.target.value })
+                        }
                     >
                       <option value="">Velg varelager-rad</option>
                       {inventory.flatMap((row) =>
@@ -1239,7 +1397,9 @@ export default function App() {
                     Eller vare
                     <select
                         value={consumptionForm.vareId}
-                        onChange={(e) => setConsumptionForm({ ...consumptionForm, vareId: e.target.value })}
+                        onChange={(e) =>
+                            setConsumptionForm({ ...consumptionForm, vareId: e.target.value })
+                        }
                     >
                       <option value="">Velg vare</option>
                       {products.map((product) => (
@@ -1254,7 +1414,9 @@ export default function App() {
                     Mengde
                     <input
                         value={consumptionForm.kvantitet}
-                        onChange={(e) => setConsumptionForm({ ...consumptionForm, kvantitet: e.target.value })}
+                        onChange={(e) =>
+                            setConsumptionForm({ ...consumptionForm, kvantitet: e.target.value })
+                        }
                     />
                   </label>
 
@@ -1262,7 +1424,12 @@ export default function App() {
                     Måleenhet
                     <select
                         value={consumptionForm.maaleenhetId}
-                        onChange={(e) => setConsumptionForm({ ...consumptionForm, maaleenhetId: e.target.value })}
+                        onChange={(e) =>
+                            setConsumptionForm({
+                              ...consumptionForm,
+                              maaleenhetId: e.target.value
+                            })
+                        }
                     >
                       <option value="">Ingen</option>
                       {units.map((unit) => (
@@ -1278,7 +1445,12 @@ export default function App() {
                     <input
                         type="date"
                         value={consumptionForm.forbruksdato}
-                        onChange={(e) => setConsumptionForm({ ...consumptionForm, forbruksdato: e.target.value })}
+                        onChange={(e) =>
+                            setConsumptionForm({
+                              ...consumptionForm,
+                              forbruksdato: e.target.value
+                            })
+                        }
                     />
                   </label>
                 </div>
@@ -1303,7 +1475,11 @@ export default function App() {
                     <tbody>
                     {consumptionRows.map((row) => (
                         <tr key={row.id}>
-                          <td>{row.forbruksdato ? new Date(row.forbruksdato).toLocaleDateString() : "-"}</td>
+                          <td>
+                            {row.forbruksdato
+                                ? new Date(row.forbruksdato).toLocaleDateString()
+                                : "-"}
+                          </td>
                           <td>{row.varenavn}</td>
                           <td>{row.varetype}</td>
                           <td>{row.kvantitet ?? "-"}</td>
@@ -1330,7 +1506,9 @@ export default function App() {
                     Porsjoner
                     <input
                         value={recipeForm.servings}
-                        onChange={(e) => setRecipeForm({ ...recipeForm, servings: e.target.value })}
+                        onChange={(e) =>
+                            setRecipeForm({ ...recipeForm, servings: e.target.value })
+                        }
                     />
                   </label>
                 </div>
@@ -1339,7 +1517,9 @@ export default function App() {
                   Bilde-URL
                   <input
                       value={recipeForm.imageUrl}
-                      onChange={(e) => setRecipeForm({ ...recipeForm, imageUrl: e.target.value })}
+                      onChange={(e) =>
+                          setRecipeForm({ ...recipeForm, imageUrl: e.target.value })
+                      }
                   />
                 </label>
 
@@ -1348,7 +1528,9 @@ export default function App() {
                   <textarea
                       rows="5"
                       value={recipeForm.instructions}
-                      onChange={(e) => setRecipeForm({ ...recipeForm, instructions: e.target.value })}
+                      onChange={(e) =>
+                          setRecipeForm({ ...recipeForm, instructions: e.target.value })
+                      }
                   />
                 </label>
 
@@ -1359,7 +1541,9 @@ export default function App() {
                         Varetype
                         <select
                             value={ingredient.productTypeId}
-                            onChange={(e) => updateIngredient(index, "productTypeId", e.target.value)}
+                            onChange={(e) =>
+                                updateIngredient(index, "productTypeId", e.target.value)
+                            }
                         >
                           <option value="">Velg varetype</option>
                           {productTypes.map((type) => (
@@ -1382,7 +1566,9 @@ export default function App() {
                         Måleenhet
                         <select
                             value={ingredient.measurementUnitId}
-                            onChange={(e) => updateIngredient(index, "measurementUnitId", e.target.value)}
+                            onChange={(e) =>
+                                updateIngredient(index, "measurementUnitId", e.target.value)
+                            }
                         >
                           <option value="">Ingen</option>
                           {units.map((unit) => (
@@ -1398,7 +1584,9 @@ export default function App() {
                         <input
                             type="checkbox"
                             checked={ingredient.optional}
-                            onChange={(e) => updateIngredient(index, "optional", e.target.checked)}
+                            onChange={(e) =>
+                                updateIngredient(index, "optional", e.target.checked)
+                            }
                         />
                       </label>
                     </div>
@@ -1418,7 +1606,8 @@ export default function App() {
                         <ul>
                           {recipe.ingredienser?.map((ingredient) => (
                               <li key={ingredient.id}>
-                                {ingredient.varetype} - {ingredient.kvantitet ?? 0} {ingredient.maaleenhet || ""}
+                                {ingredient.varetype} - {ingredient.kvantitet ?? 0}{" "}
+                                {ingredient.maaleenhet || ""}
                               </li>
                           ))}
                         </ul>
@@ -1434,7 +1623,9 @@ export default function App() {
                       <article className="mini-card" key={recipe.id}>
                         <h3>{recipe.navn}</h3>
                         <p>Match: {recipe.matchProsent}%</p>
-                        <p>Har {recipe.antallDuHar} av {recipe.antallIngredienser} ingredienser</p>
+                        <p>
+                          Har {recipe.antallDuHar} av {recipe.antallIngredienser} ingredienser
+                        </p>
                         <p>Mangler {recipe.antallDuMangler}</p>
                         {recipe.manglendeIngredienser?.length > 0 && (
                             <ul>
