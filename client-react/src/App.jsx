@@ -772,7 +772,12 @@ export default function App() {
 
         {!token ? (
             <section className="card">
-              <h2>Velkommen</h2>
+              <div className="section-head">
+                <div>
+                  <h2>Velkommen</h2>
+                  <p>Logg inn eller opprett en bruker for å administrere lager, forbruk og oppskrifter.</p>
+                </div>
+              </div>
 
               <div className="actions">
                 <button
@@ -888,330 +893,223 @@ export default function App() {
             </section>
         ) : (
             <>
-              <section className="card">
-                <h2>1. Husholdning</h2>
-                <div className="grid two">
-                  <label>
-                    Husholdningsnavn
-                    <input
-                        value={householdForm.navn}
-                        onChange={(e) => setHouseholdForm({ navn: e.target.value })}
-                    />
-                  </label>
-                  <div className="actions align-end">
-                    <button onClick={createHousehold}>Opprett husholdning</button>
-                    <button onClick={renameHousehold}>Oppdater navn</button>
-                  </div>
-                </div>
-
-                <div className="mini-card">
-                  <p>
-                    <strong>Aktiv husholdning:</strong> {household?.navn || "-"}
-                  </p>
-                  <p>
-                    <strong>Min rolle:</strong> {household?.minRolle || "-"}
-                  </p>
-                </div>
+              <section className="stats-grid">
+                <article className="stat-card">
+                  <span className="stat-label">Produkter</span>
+                  <strong className="stat-value">{products.length}</strong>
+                </article>
+                <article className="stat-card">
+                  <span className="stat-label">Varelager</span>
+                  <strong className="stat-value">{inventory.length}</strong>
+                </article>
+                <article className="stat-card">
+                  <span className="stat-label">Handleliste</span>
+                  <strong className="stat-value">{shoppingList.length}</strong>
+                </article>
+                <article className="stat-card">
+                  <span className="stat-label">Anbefalte oppskrifter</span>
+                  <strong className="stat-value">{recommendedRecipes.length}</strong>
+                </article>
               </section>
 
-              <section className="card">
-                <h2>2. Medlemmer</h2>
-                <div className="grid three">
-                  <label>
-                    Brukernavn eller e-post
-                    <input
-                        value={memberForm.brukernavnEllerEmail}
-                        onChange={(e) =>
-                            setMemberForm({
-                              ...memberForm,
-                              brukernavnEllerEmail: e.target.value
-                            })
-                        }
-                    />
-                  </label>
-                  <label>
-                    Rolle
-                    <select
-                        value={memberForm.rolle}
-                        onChange={(e) => setMemberForm({ ...memberForm, rolle: e.target.value })}
-                    >
-                      <option value="medlem">medlem</option>
-                      <option value="eier">eier</option>
-                    </select>
-                  </label>
-                  <div className="actions align-end">
-                    <button onClick={addMember}>Legg til medlem</button>
-                    <button onClick={loadMembers}>Oppdater medlemmer</button>
+              <div className="dashboard-grid">
+                <section className="card">
+                  <div className="section-head">
+                    <div>
+                      <h2>1. Husholdning</h2>
+                      <p>Administrer navn, aktiv husholdning og rollen din.</p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="table-wrap">
-                  <table>
-                    <thead>
-                    <tr>
-                      <th>Brukernavn</th>
-                      <th>E-post</th>
-                      <th>Rolle</th>
-                      <th>Fjern</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {members.map((member) => (
-                        <tr key={member.userId}>
-                          <td>{member.brukernavn}</td>
-                          <td>{member.email}</td>
-                          <td>{member.rolle}</td>
-                          <td>
-                            {!member.erMeg && (
-                                <button onClick={() => removeMember(member.userId)}>Fjern</button>
-                            )}
-                          </td>
-                        </tr>
+                  <div className="grid two">
+                    <label>
+                      Husholdningsnavn
+                      <input
+                          value={householdForm.navn}
+                          onChange={(e) => setHouseholdForm({ navn: e.target.value })}
+                      />
+                    </label>
+                    <div className="actions align-end">
+                      <button onClick={createHousehold}>Opprett husholdning</button>
+                      <button onClick={renameHousehold}>Oppdater navn</button>
+                    </div>
+                  </div>
+
+                  <div className="mini-card">
+                    <p>
+                      <strong>Aktiv husholdning:</strong> {household?.navn || "-"}
+                    </p>
+                    <p>
+                      <strong>Min rolle:</strong> {household?.minRolle || "-"}
+                    </p>
+                  </div>
+                </section>
+
+                <section className="card">
+                  <div className="section-head">
+                    <div>
+                      <h2>2. Medlemmer</h2>
+                      <p>Inviter medlemmer og oppdater roller i husholdningen.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid three">
+                    <label>
+                      Brukernavn eller e-post
+                      <input
+                          value={memberForm.brukernavnEllerEmail}
+                          onChange={(e) =>
+                              setMemberForm({
+                                ...memberForm,
+                                brukernavnEllerEmail: e.target.value
+                              })
+                          }
+                      />
+                    </label>
+                    <label>
+                      Rolle
+                      <select
+                          value={memberForm.rolle}
+                          onChange={(e) => setMemberForm({ ...memberForm, rolle: e.target.value })}
+                      >
+                        <option value="medlem">medlem</option>
+                        <option value="eier">eier</option>
+                      </select>
+                    </label>
+                    <div className="actions align-end">
+                      <button onClick={addMember}>Legg til medlem</button>
+                      <button onClick={loadMembers}>Oppdater medlemmer</button>
+                    </div>
+                  </div>
+
+                  <div className="table-wrap">
+                    <table>
+                      <thead>
+                      <tr>
+                        <th>Brukernavn</th>
+                        <th>E-post</th>
+                        <th>Rolle</th>
+                        <th>Fjern</th>
+                      </tr>
+                      </thead>
+                      <tbody>
+                      {members.map((member) => (
+                          <tr key={member.userId}>
+                            <td>{member.brukernavn}</td>
+                            <td>{member.email}</td>
+                            <td>{member.rolle}</td>
+                            <td>
+                              {!member.erMeg && (
+                                  <button onClick={() => removeMember(member.userId)}>Fjern</button>
+                              )}
+                            </td>
+                          </tr>
+                      ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
+
+              <div className="dashboard-grid">
+                <section className="card">
+                  <div className="section-head">
+                    <div>
+                      <h2>3. Plasseringer</h2>
+                      <p>Hold orden på hvor varene ligger: kjøleskap, fryser, bod og mer.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid two">
+                    <label>
+                      Ny plassering
+                      <input
+                          value={placementForm.plassering}
+                          onChange={(e) => setPlacementForm({ plassering: e.target.value })}
+                          placeholder="Kjøleskap, fryser, bod..."
+                      />
+                    </label>
+                    <div className="actions align-end">
+                      <button onClick={addPlacement}>Legg til plassering</button>
+                      <button onClick={loadPlacements}>Oppdater plasseringer</button>
+                    </div>
+                  </div>
+
+                  <div className="cards-grid">
+                    {placements.map((placement) => (
+                        <article className="mini-card" key={placement.id}>
+                          <h3>{placement.plassering}</h3>
+                          <p>ID: {placement.id}</p>
+                          <button onClick={() => deletePlacement(placement.id)}>Slett</button>
+                        </article>
                     ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
+                  </div>
+                </section>
+
+                <section className="card">
+                  <div className="section-head">
+                    <div>
+                      <h2>4. Minimumslager og beredskapslager</h2>
+                      <p>Definer hva som skal finnes hjemme, og hva som er del av beredskapen.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid three">
+                    <label>
+                      Varetype
+                      <select
+                          value={settingsForm.productTypeId}
+                          onChange={(e) =>
+                              setSettingsForm({ ...settingsForm, productTypeId: e.target.value })
+                          }
+                      >
+                        <option value="">Velg varetype</option>
+                        {productTypes.map((type) => (
+                            <option key={type.id} value={type.id}>
+                              {type.varetype}
+                            </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label>
+                      Minimumslager
+                      <input
+                          value={settingsForm.minimumStock}
+                          onChange={(e) =>
+                              setSettingsForm({ ...settingsForm, minimumStock: e.target.value })
+                          }
+                      />
+                    </label>
+
+                    <label className="checkbox-row">
+                      <span>Del av beredskapslager</span>
+                      <input
+                          type="checkbox"
+                          checked={settingsForm.isEmergencyStock}
+                          onChange={(e) =>
+                              setSettingsForm({
+                                ...settingsForm,
+                                isEmergencyStock: e.target.checked
+                              })
+                          }
+                      />
+                    </label>
+                  </div>
+                  <div className="actions">
+                    <button onClick={saveInventorySettings}>Lagre innstillinger</button>
+                  </div>
+                </section>
+              </div>
 
               <section className="card">
-                <h2>3. Plasseringer</h2>
-                <div className="grid two">
-                  <label>
-                    Ny plassering
-                    <input
-                        value={placementForm.plassering}
-                        onChange={(e) => setPlacementForm({ plassering: e.target.value })}
-                        placeholder="Kjøleskap, fryser, bod..."
-                    />
-                  </label>
-                  <div className="actions align-end">
-                    <button onClick={addPlacement}>Legg til plassering</button>
-                    <button onClick={loadPlacements}>Oppdater plasseringer</button>
+                <div className="section-head">
+                  <div>
+                    <h2>5. Varelageroversikt</h2>
+                    <p>Se total mengde, minimumslager, beredskap og plasseringer for alle varer.</p>
                   </div>
                 </div>
 
-                <div className="cards-grid">
-                  {placements.map((placement) => (
-                      <article className="mini-card" key={placement.id}>
-                        <h3>{placement.plassering}</h3>
-                        <p>ID: {placement.id}</p>
-                        <button onClick={() => deletePlacement(placement.id)}>Slett</button>
-                      </article>
-                  ))}
-                </div>
-              </section>
-
-              <section className="card">
-                <h2>4. Filterbare varer</h2>
-                <div className="grid three">
-                  <label>
-                    Søk
-                    <input
-                        value={productSearch}
-                        onChange={(e) => setProductSearch(e.target.value)}
-                        placeholder="melk, pasta, ean..."
-                    />
-                  </label>
-                  <label>
-                    Varetype
-                    <select
-                        value={productTypeFilter}
-                        onChange={(e) => setProductTypeFilter(e.target.value)}
-                    >
-                      <option value="">Alle</option>
-                      {productTypes.map((type) => (
-                          <option key={type.id} value={type.id}>
-                            {type.varetype}
-                          </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="actions align-end">
-                    <button onClick={loadProducts}>Oppdater varer</button>
-                  </div>
-                </div>
-
-                <div className="table-wrap">
-                  <table>
-                    <thead>
-                    <tr>
-                      <th>Id</th>
-                      <th>Navn</th>
-                      <th>Merke</th>
-                      <th>Varetype</th>
-                      <th>Kategori</th>
-                      <th>Pakning</th>
-                      <th>EAN</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {products.map((product) => (
-                        <tr key={product.id}>
-                          <td>{product.id}</td>
-                          <td>{product.varenavn}</td>
-                          <td>{product.merke || "-"}</td>
-                          <td>{product.varetype}</td>
-                          <td>{product.kategori || "-"}</td>
-                          <td>
-                            {product.kvantitet
-                                ? `${product.kvantitet} ${product.maaleenhet || ""}`
-                                : "-"}
-                          </td>
-                          <td>{product.ean || "-"}</td>
-                        </tr>
-                    ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-
-              <section className="card">
-                <h2>5. Legg til vare i varelager</h2>
-                <div className="grid three">
-                  <label>
-                    Produkt
-                    <select
-                        value={inventoryForm.productId}
-                        onChange={(e) =>
-                            setInventoryForm({ ...inventoryForm, productId: e.target.value })
-                        }
-                    >
-                      <option value="">Velg produkt</option>
-                      {products.map((product) => (
-                          <option key={product.id} value={product.id}>
-                            {product.varenavn} ({product.id})
-                          </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    Mengde
-                    <input
-                        value={inventoryForm.quantity}
-                        onChange={(e) =>
-                            setInventoryForm({ ...inventoryForm, quantity: e.target.value })
-                        }
-                    />
-                  </label>
-
-                  <label>
-                    Måleenhet
-                    <select
-                        value={inventoryForm.measurementUnitId}
-                        onChange={(e) =>
-                            setInventoryForm({
-                              ...inventoryForm,
-                              measurementUnitId: e.target.value
-                            })
-                        }
-                    >
-                      <option value="">Bruk valgt / standard</option>
-                      {units.map((unit) => (
-                          <option key={unit.id} value={unit.id}>
-                            {unit.enhet}
-                          </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    Kjøpsdato
-                    <input
-                        type="date"
-                        value={inventoryForm.purchaseDate}
-                        onChange={(e) =>
-                            setInventoryForm({ ...inventoryForm, purchaseDate: e.target.value })
-                        }
-                    />
-                  </label>
-
-                  <label>
-                    Best før
-                    <input
-                        type="date"
-                        value={inventoryForm.bestBeforeDate}
-                        onChange={(e) =>
-                            setInventoryForm({ ...inventoryForm, bestBeforeDate: e.target.value })
-                        }
-                    />
-                  </label>
-
-                  <label>
-                    Plassering
-                    <select
-                        value={inventoryForm.placementId}
-                        onChange={(e) =>
-                            setInventoryForm({ ...inventoryForm, placementId: e.target.value })
-                        }
-                    >
-                      <option value="">Velg plassering</option>
-                      {placements.map((placement) => (
-                          <option key={placement.id} value={placement.id}>
-                            {placement.plassering}
-                          </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                <div className="actions">
-                  <button onClick={addInventoryItem}>Legg til i lager</button>
-                  <button onClick={loadInventory}>Oppdater varelager</button>
-                </div>
-              </section>
-
-              <section className="card">
-                <h2>6. Minimumslager og beredskapslager</h2>
-                <div className="grid three">
-                  <label>
-                    Varetype
-                    <select
-                        value={settingsForm.productTypeId}
-                        onChange={(e) =>
-                            setSettingsForm({ ...settingsForm, productTypeId: e.target.value })
-                        }
-                    >
-                      <option value="">Velg varetype</option>
-                      {productTypes.map((type) => (
-                          <option key={type.id} value={type.id}>
-                            {type.varetype}
-                          </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    Minimumslager
-                    <input
-                        value={settingsForm.minimumStock}
-                        onChange={(e) =>
-                            setSettingsForm({ ...settingsForm, minimumStock: e.target.value })
-                        }
-                    />
-                  </label>
-
-                  <label className="checkbox-row">
-                    <span>Del av beredskapslager</span>
-                    <input
-                        type="checkbox"
-                        checked={settingsForm.isEmergencyStock}
-                        onChange={(e) =>
-                            setSettingsForm({
-                              ...settingsForm,
-                              isEmergencyStock: e.target.checked
-                            })
-                        }
-                    />
-                  </label>
-                </div>
-                <div className="actions">
-                  <button onClick={saveInventorySettings}>Lagre innstillinger</button>
-                </div>
-              </section>
-
-              <section className="card">
-                <h2>7. Varelageroversikt</h2>
                 <div className="table-wrap">
                   <table>
                     <thead>
@@ -1257,15 +1155,113 @@ export default function App() {
               </section>
 
               <section className="card">
-                <h2>8. Handleliste</h2>
+                <div className="section-head">
+                  <div>
+                    <h2>6. Legg til vare i varelager</h2>
+                    <p>Registrer nye varer med mengde, datoer og plassering.</p>
+                  </div>
+                </div>
+
+                <div className="grid three">
+                  <label>
+                    Produkt
+                    <select
+                        value={inventoryForm.productId}
+                        onChange={(e) => setInventoryForm({ ...inventoryForm, productId: e.target.value })}
+                    >
+                      <option value="">Velg produkt</option>
+                      {products.map((product) => (
+                          <option key={product.id} value={product.id}>
+                            {product.varenavn} ({product.id})
+                          </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Mengde
+                    <input
+                        value={inventoryForm.quantity}
+                        onChange={(e) => setInventoryForm({ ...inventoryForm, quantity: e.target.value })}
+                    />
+                  </label>
+
+                  <label>
+                    Måleenhet
+                    <select
+                        value={inventoryForm.measurementUnitId}
+                        onChange={(e) =>
+                            setInventoryForm({
+                              ...inventoryForm,
+                              measurementUnitId: e.target.value
+                            })
+                        }
+                    >
+                      <option value="">Bruk valgt / standard</option>
+                      {units.map((unit) => (
+                          <option key={unit.id} value={unit.id}>
+                            {unit.enhet}
+                          </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Kjøpsdato
+                    <input
+                        type="date"
+                        value={inventoryForm.purchaseDate}
+                        onChange={(e) => setInventoryForm({ ...inventoryForm, purchaseDate: e.target.value })}
+                    />
+                  </label>
+
+                  <label>
+                    Best før
+                    <input
+                        type="date"
+                        value={inventoryForm.bestBeforeDate}
+                        onChange={(e) =>
+                            setInventoryForm({ ...inventoryForm, bestBeforeDate: e.target.value })
+                        }
+                    />
+                  </label>
+
+                  <label>
+                    Plassering
+                    <select
+                        value={inventoryForm.placementId}
+                        onChange={(e) => setInventoryForm({ ...inventoryForm, placementId: e.target.value })}
+                    >
+                      <option value="">Velg plassering</option>
+                      {placements.map((placement) => (
+                          <option key={placement.id} value={placement.id}>
+                            {placement.plassering}
+                          </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="actions">
+                  <button onClick={addInventoryItem}>Legg til i lager</button>
+                  <button onClick={loadInventory}>Oppdater varelager</button>
+                </div>
+              </section>
+
+              <section className="card">
+                <div className="section-head">
+                  <div>
+                    <h2>7. Handleliste</h2>
+                    <p>Administrer innkjøp og forslag basert på minimumslager.</p>
+                  </div>
+                </div>
+
                 <div className="grid four">
                   <label>
                     Varetype
                     <select
                         value={shoppingForm.varetypeId}
-                        onChange={(e) =>
-                            setShoppingForm({ ...shoppingForm, varetypeId: e.target.value })
-                        }
+                        onChange={(e) => setShoppingForm({ ...shoppingForm, varetypeId: e.target.value })}
                     >
                       <option value="">Velg varetype</option>
                       {productTypes.map((type) => (
@@ -1280,9 +1276,7 @@ export default function App() {
                     Vare
                     <select
                         value={shoppingForm.vareId}
-                        onChange={(e) =>
-                            setShoppingForm({ ...shoppingForm, vareId: e.target.value })
-                        }
+                        onChange={(e) => setShoppingForm({ ...shoppingForm, vareId: e.target.value })}
                     >
                       <option value="">Valgfri konkret vare</option>
                       {products.map((product) => (
@@ -1297,9 +1291,7 @@ export default function App() {
                     Mengde
                     <input
                         value={shoppingForm.kvantitet}
-                        onChange={(e) =>
-                            setShoppingForm({ ...shoppingForm, kvantitet: e.target.value })
-                        }
+                        onChange={(e) => setShoppingForm({ ...shoppingForm, kvantitet: e.target.value })}
                     />
                   </label>
 
@@ -1363,16 +1355,20 @@ export default function App() {
                         <h3>{item.varetype}</h3>
                         <p>Forslag mengde: {item.forslagKvantitet}</p>
                         <p>{item.begrunnelse}</p>
-                        <button onClick={() => addSuggestionToShoppingList(item)}>
-                          Legg til forslag
-                        </button>
+                        <button onClick={() => addSuggestionToShoppingList(item)}>Legg til forslag</button>
                       </article>
                   ))}
                 </div>
               </section>
 
               <section className="card">
-                <h2>9. Forbruk</h2>
+                <div className="section-head">
+                  <div>
+                    <h2>8. Forbruk</h2>
+                    <p>Registrer hva som brukes, og få oppdatert lager og oppskriftsmatch.</p>
+                  </div>
+                </div>
+
                 <div className="grid four">
                   <label>
                     Fra varelager-rad
@@ -1397,9 +1393,7 @@ export default function App() {
                     Eller vare
                     <select
                         value={consumptionForm.vareId}
-                        onChange={(e) =>
-                            setConsumptionForm({ ...consumptionForm, vareId: e.target.value })
-                        }
+                        onChange={(e) => setConsumptionForm({ ...consumptionForm, vareId: e.target.value })}
                     >
                       <option value="">Velg vare</option>
                       {products.map((product) => (
@@ -1425,10 +1419,7 @@ export default function App() {
                     <select
                         value={consumptionForm.maaleenhetId}
                         onChange={(e) =>
-                            setConsumptionForm({
-                              ...consumptionForm,
-                              maaleenhetId: e.target.value
-                            })
+                            setConsumptionForm({ ...consumptionForm, maaleenhetId: e.target.value })
                         }
                     >
                       <option value="">Ingen</option>
@@ -1446,10 +1437,7 @@ export default function App() {
                         type="date"
                         value={consumptionForm.forbruksdato}
                         onChange={(e) =>
-                            setConsumptionForm({
-                              ...consumptionForm,
-                              forbruksdato: e.target.value
-                            })
+                            setConsumptionForm({ ...consumptionForm, forbruksdato: e.target.value })
                         }
                     />
                   </label>
@@ -1476,9 +1464,7 @@ export default function App() {
                     {consumptionRows.map((row) => (
                         <tr key={row.id}>
                           <td>
-                            {row.forbruksdato
-                                ? new Date(row.forbruksdato).toLocaleDateString()
-                                : "-"}
+                            {row.forbruksdato ? new Date(row.forbruksdato).toLocaleDateString() : "-"}
                           </td>
                           <td>{row.varenavn}</td>
                           <td>{row.varetype}</td>
@@ -1493,7 +1479,13 @@ export default function App() {
               </section>
 
               <section className="card">
-                <h2>10. Oppskrifter</h2>
+                <div className="section-head">
+                  <div>
+                    <h2>9. Oppskrifter</h2>
+                    <p>Lag oppskrifter med ingredienser, porsjoner og instruksjoner.</p>
+                  </div>
+                </div>
+
                 <div className="grid two">
                   <label>
                     Navn
@@ -1506,9 +1498,7 @@ export default function App() {
                     Porsjoner
                     <input
                         value={recipeForm.servings}
-                        onChange={(e) =>
-                            setRecipeForm({ ...recipeForm, servings: e.target.value })
-                        }
+                        onChange={(e) => setRecipeForm({ ...recipeForm, servings: e.target.value })}
                     />
                   </label>
                 </div>
@@ -1517,9 +1507,7 @@ export default function App() {
                   Bilde-URL
                   <input
                       value={recipeForm.imageUrl}
-                      onChange={(e) =>
-                          setRecipeForm({ ...recipeForm, imageUrl: e.target.value })
-                      }
+                      onChange={(e) => setRecipeForm({ ...recipeForm, imageUrl: e.target.value })}
                   />
                 </label>
 
@@ -1528,9 +1516,7 @@ export default function App() {
                   <textarea
                       rows="5"
                       value={recipeForm.instructions}
-                      onChange={(e) =>
-                          setRecipeForm({ ...recipeForm, instructions: e.target.value })
-                      }
+                      onChange={(e) => setRecipeForm({ ...recipeForm, instructions: e.target.value })}
                   />
                 </label>
 
@@ -1541,9 +1527,7 @@ export default function App() {
                         Varetype
                         <select
                             value={ingredient.productTypeId}
-                            onChange={(e) =>
-                                updateIngredient(index, "productTypeId", e.target.value)
-                            }
+                            onChange={(e) => updateIngredient(index, "productTypeId", e.target.value)}
                         >
                           <option value="">Velg varetype</option>
                           {productTypes.map((type) => (
@@ -1584,9 +1568,7 @@ export default function App() {
                         <input
                             type="checkbox"
                             checked={ingredient.optional}
-                            onChange={(e) =>
-                                updateIngredient(index, "optional", e.target.checked)
-                            }
+                            onChange={(e) => updateIngredient(index, "optional", e.target.checked)}
                         />
                       </label>
                     </div>
@@ -1606,8 +1588,7 @@ export default function App() {
                         <ul>
                           {recipe.ingredienser?.map((ingredient) => (
                               <li key={ingredient.id}>
-                                {ingredient.varetype} - {ingredient.kvantitet ?? 0}{" "}
-                                {ingredient.maaleenhet || ""}
+                                {ingredient.varetype} - {ingredient.kvantitet ?? 0} {ingredient.maaleenhet || ""}
                               </li>
                           ))}
                         </ul>
@@ -1617,7 +1598,13 @@ export default function App() {
               </section>
 
               <section className="card">
-                <h2>11. Anbefalte oppskrifter</h2>
+                <div className="section-head">
+                  <div>
+                    <h2>10. Anbefalte oppskrifter</h2>
+                    <p>Se hva du kan lage basert på varene som allerede finnes i lageret.</p>
+                  </div>
+                </div>
+
                 <div className="cards-grid">
                   {recommendedRecipes.map((recipe) => (
                       <article className="mini-card" key={recipe.id}>
@@ -1636,6 +1623,76 @@ export default function App() {
                         )}
                       </article>
                   ))}
+                </div>
+              </section>
+
+              <section className="card">
+                <div className="section-head">
+                  <div>
+                    <h2>11. Filterbare varer</h2>
+                    <p>Bla gjennom alle varer og filtrer etter navn eller varetype.</p>
+                  </div>
+                </div>
+
+                <div className="grid three">
+                  <label>
+                    Søk
+                    <input
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                        placeholder="melk, pasta, ean..."
+                    />
+                  </label>
+                  <label>
+                    Varetype
+                    <select
+                        value={productTypeFilter}
+                        onChange={(e) => setProductTypeFilter(e.target.value)}
+                    >
+                      <option value="">Alle</option>
+                      {productTypes.map((type) => (
+                          <option key={type.id} value={type.id}>
+                            {type.varetype}
+                          </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="actions align-end">
+                    <button onClick={loadProducts}>Oppdater varer</button>
+                  </div>
+                </div>
+
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                    <tr>
+                      <th>Id</th>
+                      <th>Navn</th>
+                      <th>Merke</th>
+                      <th>Varetype</th>
+                      <th>Kategori</th>
+                      <th>Pakning</th>
+                      <th>EAN</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {products.map((product) => (
+                        <tr key={product.id}>
+                          <td>{product.id}</td>
+                          <td>{product.varenavn}</td>
+                          <td>{product.merke || "-"}</td>
+                          <td>{product.varetype}</td>
+                          <td>{product.kategori || "-"}</td>
+                          <td>
+                            {product.kvantitet
+                                ? `${product.kvantitet} ${product.maaleenhet || ""}`
+                                : "-"}
+                          </td>
+                          <td>{product.ean || "-"}</td>
+                        </tr>
+                    ))}
+                    </tbody>
+                  </table>
                 </div>
               </section>
             </>
