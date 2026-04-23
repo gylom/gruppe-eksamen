@@ -17,3 +17,8 @@ public class CreateRecipeRequest
     public string? Bilde { get; set; }
     public List<RecipeIngredientInput> Ingredienser { get; set; } = new();
 }
+
+public class RateRecipeRequest
+{
+    public string Rating { get; set; } = string.Empty;
+}

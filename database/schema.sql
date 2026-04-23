@@ -214,6 +214,19 @@ CREATE TABLE Skjuloppskrift (
     FOREIGN KEY (user_id) REFERENCES Brukere(id)
 );
 
+CREATE TABLE OppskriftVurderinger (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    oppskrift_id BIGINT UNSIGNED NOT NULL,
+    husholdning_id BIGINT UNSIGNED NOT NULL,
+    rating ENUM("A", "B", "C", "F") NOT NULL DEFAULT "C",
+    updated_at DATETIME NULL,
+
+    UNIQUE (oppskrift_id, husholdning_id),
+
+    FOREIGN KEY (oppskrift_id) REFERENCES Oppskrifter(id),
+    FOREIGN KEY (husholdning_id) REFERENCES Husholdning(id)
+);
+
 -- =========================
 -- SKJULVARE
 -- =========================

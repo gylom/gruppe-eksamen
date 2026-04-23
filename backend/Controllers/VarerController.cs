@@ -1,4 +1,6 @@
 using DefaultNamespace.Data;
+using DefaultNamespace.DTOs;
+using DefaultNamespace.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -81,5 +83,39 @@ public class VarerController : ControllerBase
             .FirstOrDefaultAsync();
 
         return item == null ? NotFound(new { message = "Vare ikke funnet." }) : Ok(item);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Create(CreateProductRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Varenavn))
+            return BadRequest(new { message = "Varenavn må fylles ut." });
+
+        var varetypeExists = await _db.Varetyper.AnyAsync(x => x.Id == request.VaretypeId);
+        if (!varetypeExists)
+            return NotFound(new { message = "Varetype ikke funnet." });
+
+        var unitExists = await _db.Maaleenheter.AnyAsync(x => x.Id == request.MaaleenhetId);
+        if (!unitExists)
+            return NotFound(new { message = "Måleenhet ikke funnet." });
+
+        var vare = new Vare
+        {
+            Varenavn = request.Varenavn.Trim(),
+            VaretypeId = request.VaretypeId,
+            Merke = request.Merke?.Trim() ?? string.Empty,
+            Kvantitet = request.Kvantitet ?? 0,
+            MaaleenhetId = request.MaaleenhetId,
+            Ean = request.Ean?.Trim() ?? string.Empty
+        };
+
+        _db.Varer.Add(vare);
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Vare opprettet.",
+            id = vare.Id
+        });
     }
 }

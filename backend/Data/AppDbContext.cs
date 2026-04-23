@@ -24,6 +24,7 @@ public class AppDbContext : DbContext
     public DbSet<Oppskrift> Oppskrifter => Set<Oppskrift>();
     public DbSet<Ingrediens> Ingredienser => Set<Ingrediens>();
     public DbSet<Skjuloppskrift> Skjuloppskrifter => Set<Skjuloppskrift>();
+    public DbSet<OppskriftVurdering> OppskriftVurderinger => Set<OppskriftVurdering>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,6 +43,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Oppskrift>().ToTable("Oppskrifter");
         modelBuilder.Entity<Ingrediens>().ToTable("Ingredienser");
         modelBuilder.Entity<Skjuloppskrift>().ToTable("Skjuloppskrift");
+        modelBuilder.Entity<OppskriftVurdering>().ToTable("OppskriftVurderinger");
 
         modelBuilder.Entity<Varekategori>()
             .HasOne(x => x.Parent)
@@ -172,5 +174,15 @@ public class AppDbContext : DbContext
             .HasOne(x => x.Bruker)
             .WithMany()
             .HasForeignKey(x => x.UserId);
+
+        modelBuilder.Entity<OppskriftVurdering>()
+            .HasOne(x => x.Oppskrift)
+            .WithMany()
+            .HasForeignKey(x => x.OppskriftId);
+
+        modelBuilder.Entity<OppskriftVurdering>()
+            .HasOne(x => x.Husholdning)
+            .WithMany()
+            .HasForeignKey(x => x.HusholdningId);
     }
 }

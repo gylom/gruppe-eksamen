@@ -77,8 +77,15 @@ public class PlasseringController : ControllerBase
         var row = await _db.Plasseringer.FirstOrDefaultAsync(x => x.Id == (ulong)id && x.HusholdningId == householdId.Value);
         if (row == null) return NotFound(new { message = "Plassering ikke funnet." });
 
-        var inUse = await _db.Varelager.AnyAsync(x => x.PlasseringId == row.Id);
-        if (inUse) return BadRequest(new { message = "Plasseringen kan ikke slettes fordi varer er plassert der." });
+        // Det kan fortsatt finnes varelager-rader som peker til denne plasseringen,
+        // selv om de ikke er tydelige i oversikten. Før vi sletter plasseringen,
+        // løsner vi alle slike rader direkte i databasen. Dette må gjøres før DELETE,
+        // ellers stopper MySQL på foreign key mot Varelager.plassering_id.
+        await _db.Database.ExecuteSqlRawAsync(
+            "UPDATE Varelager SET plassering_id = NULL WHERE husholdning_id = {0} AND plassering_id = {1}",
+            householdId.Value,
+            row.Id
+        );
 
         _db.Plasseringer.Remove(row);
         await _db.SaveChangesAsync();

@@ -27,7 +27,9 @@ export default function App() {
   const [units, setUnits] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [recipes, setRecipes] = useState([]);
+  const [hiddenRecipes, setHiddenRecipes] = useState([]);
   const [recommendedRecipes, setRecommendedRecipes] = useState([]);
+  const [recommendedSortMode, setRecommendedSortMode] = useState("match");
 
   const [household, setHousehold] = useState(null);
   const [members, setMembers] = useState([]);
@@ -38,6 +40,14 @@ export default function App() {
 
   const [productSearch, setProductSearch] = useState("");
   const [productTypeFilter, setProductTypeFilter] = useState("");
+  const [newProductForm, setNewProductForm] = useState({
+    varenavn: "",
+    varetypeId: "",
+    merke: "",
+    kvantitet: "1",
+    maaleenhetId: "",
+    ean: ""
+  });
 
   const [inventoryForm, setInventoryForm] = useState({
     productId: "",
@@ -131,6 +141,7 @@ export default function App() {
     setUnits([]);
     setInventory([]);
     setRecipes([]);
+    setHiddenRecipes([]);
     setRecommendedRecipes([]);
     setHousehold(null);
     setMembers([]);
@@ -221,6 +232,53 @@ export default function App() {
     } catch (err) {
       console.error(err);
       showError("Kunne ikke hente varer.");
+    }
+  }
+
+  async function createProduct() {
+    try {
+      if (!newProductForm.varenavn.trim()) {
+        showError("Skriv inn varenavn.");
+        return;
+      }
+
+      if (!newProductForm.varetypeId) {
+        showError("Velg varetype.");
+        return;
+      }
+
+      if (!newProductForm.maaleenhetId) {
+        showError("Velg måleenhet.");
+        return;
+      }
+
+      await api.post(
+        "/varer",
+        {
+          varenavn: newProductForm.varenavn.trim(),
+          varetypeId: Number(newProductForm.varetypeId),
+          merke: newProductForm.merke.trim() || null,
+          kvantitet: newProductForm.kvantitet ? Number(newProductForm.kvantitet) : 0,
+          maaleenhetId: Number(newProductForm.maaleenhetId),
+          ean: newProductForm.ean.trim() || null
+        },
+        { headers: authHeaders }
+      );
+
+      setNewProductForm({
+        varenavn: "",
+        varetypeId: "",
+        merke: "",
+        kvantitet: "1",
+        maaleenhetId: "",
+        ean: ""
+      });
+
+      showMessage("Ny vare opprettet.");
+      await loadProducts();
+    } catch (err) {
+      console.error(err);
+      showError(err.response?.data?.message || "Kunne ikke opprette vare.");
     }
   }
 
@@ -348,6 +406,29 @@ export default function App() {
     }
   }
 
+  async function loadHiddenRecipes() {
+    try {
+      const res = await api.get("/oppskrifter/skjulte", { headers: authHeaders });
+      setHiddenRecipes(res.data);
+    } catch (err) {
+      console.error(err);
+      showError("Kunne ikke hente skjulte oppskrifter.");
+    }
+  }
+
+  async function rateRecipe(recipeId, rating) {
+    try {
+      await api.put(`/oppskrifter/${recipeId}/rating`, { rating }, { headers: authHeaders });
+      showMessage(`Oppskrift vurdert til ${rating}-tier.`);
+      await loadRecipes();
+      await loadRecommendedRecipes();
+      await loadHiddenRecipes();
+    } catch (err) {
+      console.error(err);
+      showError(err.response?.data?.message || "Kunne ikke vurdere oppskriften.");
+    }
+  }
+
   function updateIngredient(index, field, value) {
     const ingredients = [...recipeForm.ingredients];
     ingredients[index] = { ...ingredients[index], [field]: value };
@@ -416,9 +497,28 @@ export default function App() {
       showMessage("Oppskrift opprettet.");
       await loadRecipes();
       await loadRecommendedRecipes();
+      await loadHiddenRecipes();
     } catch (err) {
       console.error(err);
       showError(err.response?.data?.message || "Kunne ikke opprette oppskrift.");
+    }
+  }
+
+  async function deleteRecipe(recipeId) {
+    if (!window.confirm("Er du sikker på at du vil slette oppskriften?")) return;
+
+    try {
+      await api.delete(`/oppskrifter/${recipeId}`, {
+        headers: authHeaders
+      });
+
+      showMessage("Oppskrift slettet.");
+      await loadRecipes();
+      await loadRecommendedRecipes();
+      await loadHiddenRecipes();
+    } catch (err) {
+      console.error(err);
+      showError(err.response?.data?.message || "Kunne ikke slette oppskriften.");
     }
   }
 
@@ -747,6 +847,7 @@ export default function App() {
     loadInventory();
     loadRecipes();
     loadRecommendedRecipes();
+    loadHiddenRecipes();
     loadHousehold();
     loadMembers();
     loadPlacements();
@@ -758,6 +859,44 @@ export default function App() {
     if (!token) return;
     loadProducts();
   }, [productSearch, productTypeFilter]);
+
+  const recommendedRecipesToShow = useMemo(() => {
+    const ratingOrder = { A: 4, B: 3, C: 2, F: 1, null: 0, undefined: 0, "": 0 };
+    const list = [...recommendedRecipes];
+
+    if (recommendedSortMode === "rating") {
+      return list.sort((a, b) => {
+        const ratingDiff = (ratingOrder[b.rating] ?? 0) - (ratingOrder[a.rating] ?? 0);
+        if (ratingDiff !== 0) return ratingDiff;
+        if (b.matchProsent !== a.matchProsent) return b.matchProsent - a.matchProsent;
+        return a.navn.localeCompare(b.navn, "nb");
+      });
+    }
+
+    return list.sort((a, b) => {
+      if (b.matchProsent !== a.matchProsent) return b.matchProsent - a.matchProsent;
+      if (a.antallDuMangler !== b.antallDuMangler) return a.antallDuMangler - b.antallDuMangler;
+      return a.navn.localeCompare(b.navn, "nb");
+    });
+  }, [recommendedRecipes, recommendedSortMode]);
+
+  function renderRatingButtons(recipe) {
+    const ratings = ["A", "B", "C", "F"];
+
+    return (
+        <div className="tier-actions">
+          {ratings.map((rating) => (
+              <button
+                  key={`${recipe.id}-${rating}`}
+                  className={recipe.rating === rating ? "tier-button active" : "tier-button"}
+                  onClick={() => rateRecipe(recipe.id, rating)}
+              >
+                {rating}-tier
+              </button>
+          ))}
+        </div>
+    );
+  }
 
   useEffect(() => {
     if (!message && !error) return;
@@ -1605,6 +1744,11 @@ export default function App() {
                       <article className="mini-card" key={recipe.id}>
                         <h3>{recipe.navn}</h3>
                         <p>{recipe.porsjoner} porsjoner</p>
+                        <p>Vurdering: <strong>{recipe.rating ? `${recipe.rating}-tier` : "Ikke vurdert"}</strong></p>
+                        {renderRatingButtons(recipe)}
+                        <div className="actions">
+                          <button onClick={() => deleteRecipe(recipe.id)}>Slett oppskrift</button>
+                        </div>
                         <ul>
                           {recipe.ingredienser?.map((ingredient) => (
                               <li key={ingredient.id}>
@@ -1612,6 +1756,30 @@ export default function App() {
                               </li>
                           ))}
                         </ul>
+                      </article>
+                  ))}
+                </div>
+
+                <div className="section-head nested-section-head">
+                  <div>
+                    <h3>Skjulte oppskrifter</h3>
+                    <p>Viser oppskrifter som er skjult fra seed-data eller automatisk flyttet hit med F-tier.</p>
+                  </div>
+                </div>
+
+                <div className="cards-grid">
+                  {hiddenRecipes.length === 0 && <p>Ingen skjulte oppskrifter ennå.</p>}
+                  {hiddenRecipes.map((recipe) => (
+                      <article className="mini-card muted-card" key={`hidden-${recipe.id}`}>
+                        <h3>{recipe.navn}</h3>
+                        <p>{recipe.porsjoner} porsjoner</p>
+                        <p>Vurdering: <strong>{recipe.rating ? `${recipe.rating}-tier` : "Ikke vurdert"}</strong></p>
+                        <p>Skjult fordi: {recipe.skjultBegrunnelse || "Skjult"}</p>
+                        {recipe.skjultKommentar && <p>Kommentar: {recipe.skjultKommentar}</p>}
+                        {renderRatingButtons(recipe)}
+                        <div className="actions">
+                          <button onClick={() => deleteRecipe(recipe.id)}>Slett oppskrift</button>
+                        </div>
                       </article>
                   ))}
                 </div>
@@ -1625,11 +1793,31 @@ export default function App() {
                   </div>
                 </div>
 
+                <div className="actions">
+                  <button
+                      className={recommendedSortMode === "match" ? "active" : ""}
+                      onClick={() => setRecommendedSortMode("match")}
+                  >
+                    Sorter på match %
+                  </button>
+                  <button
+                      className={recommendedSortMode === "rating" ? "active" : ""}
+                      onClick={() => setRecommendedSortMode("rating")}
+                  >
+                    Sorter på vurdering
+                  </button>
+                </div>
+
                 <div className="cards-grid">
-                  {recommendedRecipes.map((recipe) => (
+                  {recommendedRecipesToShow.map((recipe) => (
                       <article className="mini-card" key={recipe.id}>
                         <h3>{recipe.navn}</h3>
                         <p>Match: {recipe.matchProsent}%</p>
+                        <p>Vurdering: <strong>{recipe.rating ? `${recipe.rating}-tier` : "Ikke vurdert"}</strong></p>
+                        {renderRatingButtons(recipe)}
+                        <div className="actions">
+                          <button onClick={() => deleteRecipe(recipe.id)}>Slett oppskrift</button>
+                        </div>
                         <p>
                           Har {recipe.antallDuHar} av {recipe.antallIngredienser} ingredienser
                         </p>
@@ -1649,7 +1837,101 @@ export default function App() {
               <section className="card">
                 <div className="section-head">
                   <div>
-                    <h2>11. Filterbare varer</h2>
+                    <h2>11. Opprett ny vare</h2>
+                    <p>Legg til en vare som ikke finnes fra før, slik at den kan brukes i handleliste, varelager og vareoversikt.</p>
+                  </div>
+                </div>
+
+                <div className="grid three">
+                  <label>
+                    Varenavn
+                    <input
+                        value={newProductForm.varenavn}
+                        onChange={(e) =>
+                            setNewProductForm({ ...newProductForm, varenavn: e.target.value })
+                        }
+                        placeholder="f.eks. First Price Havregryn"
+                    />
+                  </label>
+
+                  <label>
+                    Varetype
+                    <select
+                        value={newProductForm.varetypeId}
+                        onChange={(e) =>
+                            setNewProductForm({ ...newProductForm, varetypeId: e.target.value })
+                        }
+                    >
+                      <option value="">Velg varetype</option>
+                      {productTypes.map((type) => (
+                          <option key={type.id} value={type.id}>
+                            {type.varetype}
+                          </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Merke
+                    <input
+                        value={newProductForm.merke}
+                        onChange={(e) =>
+                            setNewProductForm({ ...newProductForm, merke: e.target.value })
+                        }
+                        placeholder="f.eks. First Price"
+                    />
+                  </label>
+
+                  <label>
+                    Standard kvantitet
+                    <input
+                        value={newProductForm.kvantitet}
+                        onChange={(e) =>
+                            setNewProductForm({ ...newProductForm, kvantitet: e.target.value })
+                        }
+                        placeholder="1"
+                    />
+                  </label>
+
+                  <label>
+                    Måleenhet
+                    <select
+                        value={newProductForm.maaleenhetId}
+                        onChange={(e) =>
+                            setNewProductForm({ ...newProductForm, maaleenhetId: e.target.value })
+                        }
+                    >
+                      <option value="">Velg måleenhet</option>
+                      {units.map((unit) => (
+                          <option key={unit.id} value={unit.id}>
+                            {unit.enhet}
+                          </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    EAN
+                    <input
+                        value={newProductForm.ean}
+                        onChange={(e) =>
+                            setNewProductForm({ ...newProductForm, ean: e.target.value })
+                        }
+                        placeholder="Valgfritt"
+                    />
+                  </label>
+                </div>
+
+                <div className="actions">
+                  <button onClick={createProduct}>Opprett vare</button>
+                  <button onClick={loadProducts}>Oppdater varer</button>
+                </div>
+              </section>
+
+              <section className="card">
+                <div className="section-head">
+                  <div>
+                    <h2>12. Filterbare varer</h2>
                     <p>Bla gjennom alle varer og filtrer etter navn eller varetype.</p>
                   </div>
                 </div>

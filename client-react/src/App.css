@@ -435,3 +435,29 @@ li + li {
     min-width: 640px;
   }
 }
+.nested-section-head {
+  margin-top: 24px;
+}
+
+.tier-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 14px;
+}
+
+.tier-button {
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+}
+
+.tier-button.active {
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+}
+
+.muted-card {
+  opacity: 0.92;
+  border-style: dashed;
+}
