@@ -17,7 +17,7 @@ export default function App() {
   const [email, setEmail] = useState("gytis@test.no");
   const [passord, setPassord] = useState("Test123!");
   const [fullName, setFullName] = useState("Gytis");
-  const [householdName, setHouseholdName] = useState("Gytis sitt hjem");
+  const [householdName, setHouseholdName] = useState("");
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -541,6 +541,23 @@ export default function App() {
       showError(err.response?.data?.message || "Kunne ikke fjerne medlem.");
     }
   }
+  async function leaveHousehold() {
+    if (!window.confirm("Vil du forlate husholdningen?")) return;
+
+    try {
+      await api.delete("/husholdning/leave", {
+        headers: authHeaders
+      });
+
+      showMessage("Du har forlatt husholdningen.");
+      await loadHousehold();
+      await loadMembers();
+      await loadPlacements();
+    } catch (err) {
+      console.error(err);
+      showError(err.response?.data?.message || "Kunne ikke forlate husholdningen.");
+    }
+  }
 
   async function loadPlacements() {
     try {
@@ -878,7 +895,7 @@ export default function App() {
                         <input
                             value={householdName}
                             onChange={(e) => setHouseholdName(e.target.value)}
-                            placeholder="Navn på husholdning"
+                            placeholder="Navn på husholdning (Optional) "
                         />
                       </label>
                     </div>
@@ -979,6 +996,9 @@ export default function App() {
                     <div className="actions align-end">
                       <button onClick={addMember}>Legg til medlem</button>
                       <button onClick={loadMembers}>Oppdater medlemmer</button>
+                      {household && (
+                          <button onClick={leaveHousehold}>Forlat husholdning</button>
+                      )}
                     </div>
                   </div>
 

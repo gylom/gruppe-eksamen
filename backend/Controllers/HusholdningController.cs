@@ -188,24 +188,142 @@ public class HusholdningController : ControllerBase
     public async Task<IActionResult> RemoveMedlem(long userId)
     {
         if (userId < 1) return BadRequest(new { message = "Ugyldig bruker-id." });
+
         var currentUserId = GetUserId();
         if (currentUserId == null) return Unauthorized();
 
         var myMembership = await _db.Medlemmer.FirstOrDefaultAsync(x => x.UserId == currentUserId.Value);
         if (myMembership == null) return BadRequest(new { message = "Brukeren er ikke medlem av en husholdning." });
 
-        var targetMembership = await _db.Medlemmer.FirstOrDefaultAsync(x => x.UserId == (ulong)userId && x.HusholdningId == myMembership.HusholdningId);
+        var targetMembership = await _db.Medlemmer.FirstOrDefaultAsync(
+            x => x.UserId == (ulong)userId && x.HusholdningId == myMembership.HusholdningId);
+
         if (targetMembership == null) return NotFound(new { message = "Medlem ikke funnet i husholdningen." });
 
         var removingSelf = currentUserId.Value == (ulong)userId;
         var amOwner = string.Equals(myMembership.Rolle, "eier", StringComparison.OrdinalIgnoreCase);
 
         if (!removingSelf && !amOwner) return Forbid();
-        if (removingSelf && amOwner) return BadRequest(new { message = "Eier kan ikke fjerne seg selv." });
+        if (removingSelf && amOwner) return BadRequest(new { message = "Eier kan ikke fjerne seg selv her. Bruk /api/husholdning/leave." });
 
         _db.Medlemmer.Remove(targetMembership);
         await _db.SaveChangesAsync();
+
         return Ok(new { message = "Medlem fjernet." });
+    }
+
+    [HttpDelete("leave")]
+    public async Task<IActionResult> LeaveHusholdning()
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var myMembership = await _db.Medlemmer
+            .FirstOrDefaultAsync(x => x.UserId == userId.Value);
+
+        if (myMembership == null)
+            return BadRequest(new { message = "Brukeren er ikke medlem av en husholdning." });
+
+        var isOwner = string.Equals(myMembership.Rolle, "eier", StringComparison.OrdinalIgnoreCase);
+
+        await using var tx = await _db.Database.BeginTransactionAsync();
+
+        if (isOwner)
+        {
+            var otherMembers = await _db.Medlemmer
+                .Where(x => x.HusholdningId == myMembership.HusholdningId && x.UserId != userId.Value)
+                .ToListAsync();
+
+            if (otherMembers.Count > 0)
+            {
+                var randomIndex = new Random().Next(otherMembers.Count);
+                var newOwner = otherMembers[randomIndex];
+                newOwner.Rolle = "eier";
+
+                _db.Medlemmer.Remove(myMembership);
+                await _db.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                return Ok(new { message = "Du har forlatt husholdningen." });
+            }
+            else
+            {
+                var householdId = myMembership.HusholdningId;
+
+                var household = await _db.Husholdninger
+                    .FirstOrDefaultAsync(x => x.Id == householdId);
+
+                var medlemmer = await _db.Medlemmer
+                    .Where(x => x.HusholdningId == householdId)
+                    .ToListAsync();
+
+                var plasseringIds = await _db.Plasseringer
+                    .Where(x => x.HusholdningId == householdId)
+                    .Select(x => x.Id)
+                    .ToListAsync();
+
+                if (plasseringIds.Count > 0)
+                {
+                    var idList = string.Join(",", plasseringIds);
+                    await _db.Database.ExecuteSqlRawAsync($@"
+                        UPDATE Varelager
+                        SET plassering_id = NULL
+                        WHERE plassering_id IN ({idList})
+                    ");
+                }
+
+                var varelager = await _db.Varelager
+                    .Where(x => x.HusholdningId == householdId)
+                    .ToListAsync();
+
+                var plasseringer = await _db.Plasseringer
+                    .Where(x => x.HusholdningId == householdId)
+                    .ToListAsync();
+
+                var settings = await _db.Husholdningsinnstillinger
+                    .Where(x => x.HusholdningId == householdId)
+                    .ToListAsync();
+
+                if (varelager.Count > 0)
+                {
+                    _db.Varelager.RemoveRange(varelager);
+                    await _db.SaveChangesAsync();
+                }
+
+                if (plasseringer.Count > 0)
+                {
+                    _db.Plasseringer.RemoveRange(plasseringer);
+                    await _db.SaveChangesAsync();
+                }
+
+                if (settings.Count > 0)
+                {
+                    _db.Husholdningsinnstillinger.RemoveRange(settings);
+                    await _db.SaveChangesAsync();
+                }
+
+                if (medlemmer.Count > 0)
+                {
+                    _db.Medlemmer.RemoveRange(medlemmer);
+                    await _db.SaveChangesAsync();
+                }
+
+                if (household != null)
+                {
+                    _db.Husholdninger.Remove(household);
+                    await _db.SaveChangesAsync();
+                }
+
+                await tx.CommitAsync();
+                return Ok(new { message = "Du har forlatt husholdningen, og husholdningen ble slettet." });
+            }
+        }
+
+        _db.Medlemmer.Remove(myMembership);
+        await _db.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        return Ok(new { message = "Du har forlatt husholdningen." });
     }
 
     private ulong? GetUserId()
