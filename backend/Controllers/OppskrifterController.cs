@@ -19,16 +19,15 @@ public class OppskrifterController : ControllerBase
     public async Task<IActionResult> GetAll([FromQuery] string? sok)
     {
         var userId = GetUserId();
-        var householdId = GetHouseholdId();
         if (userId == null) return Unauthorized();
 
         var householdMemberIds = await GetHouseholdMemberIds();
-        var hiddenIds = await GetHiddenRecipeIds(userId.Value, householdId);
-        var ratingLookup = householdId == null
-            ? new Dictionary<ulong, string>()
-            : await _db.OppskriftVurderinger
-                .Where(x => x.HusholdningId == householdId.Value)
-                .ToDictionaryAsync(x => x.OppskriftId, x => x.Rating);
+        var preferenceLookup = await GetPreferenceLookup(userId.Value);
+
+        var hiddenIds = preferenceLookup
+            .Where(x => x.Value.Skjul || x.Value.Karakter == 1)
+            .Select(x => x.Key)
+            .ToList();
 
         var query = _db.Oppskrifter
             .Where(x => (x.UserId == userId.Value || householdMemberIds.Contains(x.UserId)) && !hiddenIds.Contains(x.Id))
@@ -44,103 +43,43 @@ public class OppskrifterController : ControllerBase
         }
 
         var recipes = await query.OrderByDescending(x => x.CreatedAt).ToListAsync();
-
-        var result = recipes.Select(x => MapRecipe(x, ratingLookup.TryGetValue(x.Id, out var rating) ? rating : null)).ToList();
-
-        return Ok(result);
+        return Ok(recipes.Select(x => MapRecipe(x, preferenceLookup.GetValueOrDefault(x.Id))).ToList());
     }
 
     [HttpGet("api/oppskrifter/skjulte")]
     public async Task<IActionResult> GetHiddenRecipes()
     {
         var userId = GetUserId();
-        var householdId = GetHouseholdId();
         if (userId == null) return Unauthorized();
 
         var householdMemberIds = await GetHouseholdMemberIds();
-        var hiddenBySeed = await _db.Skjuloppskrifter
-            .Where(x => x.UserId == userId.Value)
-            .Select(x => new { x.OppskriftId, x.Begrunnelse, x.Kommentar })
-            .ToListAsync();
+        var preferenceLookup = await GetPreferenceLookup(userId.Value);
 
-        var hiddenEntries = hiddenBySeed
-            .Select(x => (OppskriftId: x.OppskriftId, Begrunnelse: x.Begrunnelse, Kommentar: x.Kommentar))
+        var hiddenIds = preferenceLookup
+            .Where(x => x.Value.Skjul || x.Value.Karakter == 1)
+            .Select(x => x.Key)
             .ToList();
 
-        if (householdId != null)
-        {
-            var fRated = await _db.OppskriftVurderinger
-                .Where(x => x.HusholdningId == householdId.Value && x.Rating == "F")
-                .Select(x => x.OppskriftId)
-                .ToListAsync();
-
-            hiddenEntries.AddRange(fRated.Select(id => (
-                OppskriftId: id,
-                Begrunnelse: (string?)"Skjult via F-tier",
-                Kommentar: (string?)null
-            )));
-        }
-
-        var hiddenLookup = hiddenEntries
-            .GroupBy(x => x.OppskriftId)
-            .ToDictionary(g => g.Key, g => g.First());
-
-        var recipeIds = hiddenLookup.Keys.ToList();
-        if (recipeIds.Count == 0) return Ok(new List<object>());
-
-        var ratingLookup = householdId == null
-            ? new Dictionary<ulong, string>()
-            : await _db.OppskriftVurderinger
-                .Where(x => x.HusholdningId == householdId.Value)
-                .ToDictionaryAsync(x => x.OppskriftId, x => x.Rating);
+        if (hiddenIds.Count == 0) return Ok(new List<object>());
 
         var recipes = await _db.Oppskrifter
-            .Where(x => recipeIds.Contains(x.Id) && (x.UserId == userId.Value || householdMemberIds.Contains(x.UserId)))
+            .Where(x => hiddenIds.Contains(x.Id) && (x.UserId == userId.Value || householdMemberIds.Contains(x.UserId)))
             .Include(x => x.Ingredienser)!.ThenInclude(x => x.Varetype)
             .Include(x => x.Ingredienser)!.ThenInclude(x => x.Maaleenhet)
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();
 
-        var result = recipes.Select(x => new
-        {
-            id = x.Id,
-            navn = x.Navn,
-            instruksjoner = x.Instruksjoner,
-            porsjoner = x.Porsjoner,
-            bilde = x.Bilde,
-            user_id = x.UserId,
-            rating = ratingLookup.TryGetValue(x.Id, out var rating) ? rating : null,
-            skjultBegrunnelse = hiddenLookup[x.Id].Begrunnelse,
-            skjultKommentar = hiddenLookup[x.Id].Kommentar,
-            ingredienser = x.Ingredienser.Select(i => new
-            {
-                id = i.Id,
-                varetype_id = i.VaretypeId,
-                varetype = i.Varetype!.Navn,
-                kvantitet = i.Kvantitet,
-                maaleenhet_id = i.MaaleenhetId,
-                maaleenhet = i.Maaleenhet != null ? i.Maaleenhet.Enhet : null,
-                type = i.Type,
-                valgfritt = i.Valgfritt
-            })
-        }).ToList();
-
-        return Ok(result);
+        return Ok(recipes.Select(x => MapRecipe(x, preferenceLookup.GetValueOrDefault(x.Id))).ToList());
     }
 
     [HttpGet("api/oppskrifter/{id:long}")]
     public async Task<IActionResult> GetOne(ulong id)
     {
         var userId = GetUserId();
-        var householdId = GetHouseholdId();
         if (userId == null) return Unauthorized();
-        var householdMemberIds = await GetHouseholdMemberIds();
 
-        var ratingLookup = householdId == null
-            ? new Dictionary<ulong, string>()
-            : await _db.OppskriftVurderinger
-                .Where(x => x.HusholdningId == householdId.Value && x.OppskriftId == id)
-                .ToDictionaryAsync(x => x.OppskriftId, x => x.Rating);
+        var householdMemberIds = await GetHouseholdMemberIds();
+        var preferenceLookup = await GetPreferenceLookup(userId.Value);
 
         var item = await _db.Oppskrifter
             .Where(x => x.Id == id && (x.UserId == userId.Value || householdMemberIds.Contains(x.UserId)))
@@ -150,7 +89,7 @@ public class OppskrifterController : ControllerBase
 
         return item == null
             ? NotFound(new { message = "Oppskrift ikke funnet." })
-            : Ok(MapRecipe(item, ratingLookup.TryGetValue(item.Id, out var rating) ? rating : null));
+            : Ok(MapRecipe(item, preferenceLookup.GetValueOrDefault(item.Id)));
     }
 
     [HttpPost("api/oppskrifter")]
@@ -179,6 +118,7 @@ public class OppskrifterController : ControllerBase
 
         _db.Oppskrifter.Add(oppskrift);
         await _db.SaveChangesAsync();
+
         return Ok(new { message = "Oppskrift opprettet.", id = oppskrift.Id });
     }
 
@@ -188,7 +128,10 @@ public class OppskrifterController : ControllerBase
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
-        var item = await _db.Oppskrifter.Include(x => x.Ingredienser).FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId.Value);
+        var item = await _db.Oppskrifter
+            .Include(x => x.Ingredienser)
+            .FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId.Value);
+
         if (item == null) return NotFound(new { message = "Oppskrift ikke funnet." });
 
         item.Navn = request.Navn;
@@ -197,6 +140,7 @@ public class OppskrifterController : ControllerBase
         item.Bilde = request.Bilde;
 
         _db.Ingredienser.RemoveRange(item.Ingredienser);
+
         item.Ingredienser = request.Ingredienser.Select(i => new Ingrediens
         {
             OppskriftId = item.Id,
@@ -208,6 +152,7 @@ public class OppskrifterController : ControllerBase
         }).ToList();
 
         await _db.SaveChangesAsync();
+
         return Ok(new { message = "Oppskrift oppdatert." });
     }
 
@@ -228,86 +173,86 @@ public class OppskrifterController : ControllerBase
         if (recipe == null)
             return NotFound(new { message = "Oppskrift ikke funnet." });
 
-        var ratings = await _db.OppskriftVurderinger
+        var preferences = await _db.Skjuloppskrifter
             .Where(x => x.OppskriftId == id)
             .ToListAsync();
 
-        var hiddenRows = await _db.Skjuloppskrifter
-            .Where(x => x.OppskriftId == id)
-            .ToListAsync();
-
-        if (ratings.Count > 0)
-            _db.OppskriftVurderinger.RemoveRange(ratings);
-
-        if (hiddenRows.Count > 0)
-            _db.Skjuloppskrifter.RemoveRange(hiddenRows);
+        if (preferences.Count > 0)
+            _db.Skjuloppskrifter.RemoveRange(preferences);
 
         if (recipe.Ingredienser.Any())
             _db.Ingredienser.RemoveRange(recipe.Ingredienser);
 
         _db.Oppskrifter.Remove(recipe);
+
         await _db.SaveChangesAsync();
 
         return Ok(new { message = "Oppskrift slettet." });
     }
 
-    [HttpPut("api/oppskrifter/{id:long}/rating")]
-    public async Task<IActionResult> RateRecipe(ulong id, RateRecipeRequest request)
+    [HttpPut("api/oppskrifter/{id:long}/preferanse")]
+    public async Task<IActionResult> SavePreference(ulong id, RecipePreferenceRequest request)
     {
         var userId = GetUserId();
-        var householdId = GetHouseholdId();
-        if (userId == null || householdId == null) return BadRequest(new { message = "Manglende bruker/husholdning." });
-
-        var rating = (request.Rating ?? string.Empty).Trim().ToUpperInvariant();
-        var validRatings = new[] { "A", "B", "C", "F" };
-        if (!validRatings.Contains(rating))
-        {
-            return BadRequest(new { message = "Rating må være A, B, C eller F." });
-        }
+        if (userId == null) return Unauthorized();
 
         var householdMemberIds = await GetHouseholdMemberIds();
-        var recipeExists = await _db.Oppskrifter.AnyAsync(x => x.Id == id && (x.UserId == userId.Value || householdMemberIds.Contains(x.UserId)));
+
+        var recipeExists = await _db.Oppskrifter
+            .AnyAsync(x => x.Id == id && (x.UserId == userId.Value || householdMemberIds.Contains(x.UserId)));
+
         if (!recipeExists) return NotFound(new { message = "Oppskrift ikke funnet." });
 
-        var existing = await _db.OppskriftVurderinger.FirstOrDefaultAsync(x => x.OppskriftId == id && x.HusholdningId == householdId.Value);
-        if (existing == null)
+        if (request.Karakter is < 1 or > 10)
+            return BadRequest(new { message = "Karakter må være mellom 1 og 10." });
+
+        var preference = await _db.Skjuloppskrifter
+            .FirstOrDefaultAsync(x => x.OppskriftId == id && x.UserId == userId.Value);
+
+        if (preference == null)
         {
-            _db.OppskriftVurderinger.Add(new OppskriftVurdering
+            preference = new Skjuloppskrift
             {
                 OppskriftId = id,
-                HusholdningId = householdId.Value,
-                Rating = rating,
-                UpdatedAt = DateTime.UtcNow
-            });
-        }
-        else
-        {
-            existing.Rating = rating;
-            existing.UpdatedAt = DateTime.UtcNow;
+                UserId = userId.Value,
+                Skjul = false
+            };
+
+            _db.Skjuloppskrifter.Add(preference);
         }
 
-        if (rating == "F")
+        if (request.Karakter != null)
         {
-            var hidden = await _db.Skjuloppskrifter.FirstOrDefaultAsync(x => x.OppskriftId == id && x.UserId == userId.Value);
-            if (hidden == null)
+            preference.Karakter = request.Karakter.Value;
+
+            if (request.Karakter.Value == 1)
             {
-                _db.Skjuloppskrifter.Add(new Skjuloppskrift
-                {
-                    OppskriftId = id,
-                    UserId = userId.Value,
-                    Begrunnelse = "F-tier",
-                    Kommentar = "Skjult automatisk fordi oppskriften ble vurdert til F-tier."
-                });
+                preference.Skjul = true;
+                preference.Begrunnelse = "Karakter 1";
             }
-            else
-            {
-                hidden.Begrunnelse ??= "F-tier";
-                hidden.Kommentar ??= "Skjult automatisk fordi oppskriften ble vurdert til F-tier.";
-            }
+        }
+
+        preference.Skjul = request.Skjul;
+
+        if (request.Skjul)
+        {
+            preference.Begrunnelse ??= "Skjult manuelt";
+        }
+
+        if (request.Kommentar != null)
+        {
+            preference.Kommentar = request.Kommentar;
         }
 
         await _db.SaveChangesAsync();
-        return Ok(new { message = $"Oppskrift satt til {rating}-tier.", rating });
+
+        return Ok(new
+        {
+            message = preference.Skjul ? "Oppskrift skjult." : "Oppskriftpreferanse lagret.",
+            karakter = preference.Karakter,
+            skjul = preference.Skjul,
+            kommentar = preference.Kommentar
+        });
     }
 
     [HttpGet("api/oppskrifteranbefalt")]
@@ -315,13 +260,17 @@ public class OppskrifterController : ControllerBase
     {
         var userId = GetUserId();
         var householdId = GetHouseholdId();
-        if (userId == null || householdId == null) return BadRequest(new { message = "Manglende bruker/husholdning." });
+
+        if (userId == null || householdId == null)
+            return BadRequest(new { message = "Manglende bruker/husholdning." });
 
         var householdMemberIds = await GetHouseholdMemberIds();
-        var hiddenIds = await GetHiddenRecipeIds(userId.Value, householdId);
-        var ratingLookup = await _db.OppskriftVurderinger
-            .Where(x => x.HusholdningId == householdId.Value)
-            .ToDictionaryAsync(x => x.OppskriftId, x => x.Rating);
+        var preferenceLookup = await GetPreferenceLookup(userId.Value);
+
+        var hiddenIds = preferenceLookup
+            .Where(x => x.Value.Skjul || x.Value.Karakter == 1)
+            .Select(x => x.Key)
+            .ToList();
 
         var availableTypeIds = await _db.Varelager
             .Where(x => x.HusholdningId == householdId.Value && x.Kvantitet > 0)
@@ -338,30 +287,41 @@ public class OppskrifterController : ControllerBase
         {
             var required = r.Ingredienser.Where(i => !(i.Valgfritt ?? false)).ToList();
             var have = required.Count(i => availableTypeIds.Contains(i.VaretypeId));
-            var missing = required.Where(i => !availableTypeIds.Contains(i.VaretypeId)).Select(i => new
-            {
-                varetype_id = i.VaretypeId,
-                varetype = i.Varetype!.Navn,
-                kvantitet = i.Kvantitet,
-                type = i.Type,
-                valgfritt = i.Valgfritt
-            }).ToList();
+
+            var missing = required
+                .Where(i => !availableTypeIds.Contains(i.VaretypeId))
+                .Select(i => new
+                {
+                    varetype_id = i.VaretypeId,
+                    varetype = i.Varetype!.Navn,
+                    kvantitet = i.Kvantitet,
+                    type = i.Type,
+                    valgfritt = i.Valgfritt
+                })
+                .ToList();
+
+            var pref = preferenceLookup.GetValueOrDefault(r.Id);
 
             return new
             {
                 id = r.Id,
                 navn = r.Navn,
                 porsjoner = r.Porsjoner,
-                rating = ratingLookup.TryGetValue(r.Id, out var rating) ? rating : null,
+                karakter = pref?.Karakter,
+                kommentar = pref?.Kommentar,
+                skjul = pref?.Skjul ?? false,
                 antallIngredienser = required.Count,
                 antallDuHar = have,
                 antallDuMangler = missing.Count,
-                matchProsent = required.Count == 0 ? 100 : (int)Math.Round((double)have / required.Count * 100),
+                matchProsent = required.Count == 0
+                    ? 100
+                    : (int)Math.Round((double)have / required.Count * 100),
                 manglerKunFa = missing.Count <= 2,
                 manglendeIngredienser = missing
             };
         })
         .OrderByDescending(x => x.matchProsent)
+        .ThenByDescending(x => x.karakter ?? 0)
         .ThenBy(x => x.antallDuMangler)
         .ThenBy(x => x.navn)
         .ToList();
@@ -369,27 +329,14 @@ public class OppskrifterController : ControllerBase
         return Ok(result);
     }
 
-    private async Task<List<ulong>> GetHiddenRecipeIds(ulong userId, ulong? householdId)
+    private async Task<Dictionary<ulong, Skjuloppskrift>> GetPreferenceLookup(ulong userId)
     {
-        var hiddenIds = await _db.Skjuloppskrifter
+        return await _db.Skjuloppskrifter
             .Where(x => x.UserId == userId)
-            .Select(x => x.OppskriftId)
-            .ToListAsync();
-
-        if (householdId != null)
-        {
-            var fRatedIds = await _db.OppskriftVurderinger
-                .Where(x => x.HusholdningId == householdId.Value && x.Rating == "F")
-                .Select(x => x.OppskriftId)
-                .ToListAsync();
-
-            hiddenIds = hiddenIds.Union(fRatedIds).ToList();
-        }
-
-        return hiddenIds;
+            .ToDictionaryAsync(x => x.OppskriftId, x => x);
     }
 
-    private object MapRecipe(Oppskrift x, string? rating)
+    private object MapRecipe(Oppskrift x, Skjuloppskrift? preference)
     {
         return new
         {
@@ -399,7 +346,10 @@ public class OppskrifterController : ControllerBase
             porsjoner = x.Porsjoner,
             bilde = x.Bilde,
             user_id = x.UserId,
-            rating,
+            karakter = preference?.Karakter,
+            kommentar = preference?.Kommentar,
+            skjul = preference?.Skjul ?? false,
+            skjultBegrunnelse = preference?.Begrunnelse,
             ingredienser = x.Ingredienser.Select(i => new
             {
                 id = i.Id,
@@ -429,7 +379,22 @@ public class OppskrifterController : ControllerBase
     private async Task<List<ulong>> GetHouseholdMemberIds()
     {
         var householdId = GetHouseholdId();
-        if (householdId == null) return new List<ulong>();
-        return await _db.Medlemmer.Where(x => x.HusholdningId == householdId.Value).Select(x => x.UserId).ToListAsync();
+
+        if (householdId == null)
+            return new List<ulong>();
+
+        return await _db.Medlemmer
+            .Where(x => x.HusholdningId == householdId.Value)
+            .Select(x => x.UserId)
+            .ToListAsync();
     }
+}
+
+public class RecipePreferenceRequest
+{
+    public bool Skjul { get; set; }
+
+    public int? Karakter { get; set; }
+
+    public string? Kommentar { get; set; }
 }

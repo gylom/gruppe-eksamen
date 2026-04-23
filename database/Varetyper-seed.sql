@@ -38,4 +38,9 @@ INSERT INTO Varetyper (id, varetype, kategori_id) VALUES
                                                       (37, 'Øl', 50),
                                                       (38, 'Nøtter', 43),
                                                       (39, 'Kjeks', 42),
-                                                      (40, 'Godteri', 40);
+                                                      (40, 'Godteri', 40),
+                                                      (41, 'Beredskap', 58),
+                                                      (42, 'Drivstoff', 58),
+                                                      (43, 'Brensel', 58),
+                                                      (44, 'Verktøy og utstyr', 58),
+                                                      (45, 'Diverse beredskap', 58);

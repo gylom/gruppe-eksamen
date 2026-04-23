@@ -95,8 +95,12 @@ public class HandlelisteController : ControllerBase
 
         var varetypeExists = await _db.Varetyper.AnyAsync(x => x.Id == request.VaretypeId);
         if (!varetypeExists) return NotFound(new { message = "Varetype ikke funnet." });
-        if (request.VareId.HasValue && !await _db.Varer.AnyAsync(x => x.Id == request.VareId.Value))
-            return NotFound(new { message = "Vare ikke funnet." });
+
+        var memberIds = await GetHouseholdMemberIds(userId.Value);
+        if (request.VareId.HasValue && !await _db.Varer.AnyAsync(x =>
+                x.Id == request.VareId.Value &&
+                (!x.Brukerdefinert || x.UserId == null || memberIds.Contains(x.UserId.Value))))
+            return NotFound(new { message = "Vare ikke funnet eller ikke tilgjengelig for husholdningen." });
 
         var row = new HandlelisteRad
         {

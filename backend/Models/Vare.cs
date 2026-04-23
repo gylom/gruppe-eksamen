@@ -25,8 +25,15 @@ public class Vare
     public ulong MaaleenhetId { get; set; }
 
     [Column("ean")]
-    public string Ean { get; set; } = string.Empty;
+    public string? Ean { get; set; }
+
+    [Column("user_id")]
+    public ulong? UserId { get; set; }
+
+    [Column("brukerdefinert")]
+    public bool Brukerdefinert { get; set; }
 
     public Varetype? Varetype { get; set; }
     public Maaleenhet? Maaleenhet { get; set; }
+    public Bruker? Bruker { get; set; }
 }

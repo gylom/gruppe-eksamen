@@ -61,10 +61,13 @@ CREATE TABLE Varer (
     merke VARCHAR(255) NOT NULL,
     kvantitet DECIMAL(8,2) NOT NULL,
     maaleenhet_id BIGINT UNSIGNED NOT NULL,
-    ean VARCHAR(255) NOT NULL UNIQUE,
+    ean VARCHAR(255),
+    user_id BIGINT UNSIGNED NULL,
+    brukerdefinert BOOLEAN NOT NULL DEFAULT FALSE,
 
     FOREIGN KEY (varetype_id) REFERENCES Varetyper(id),
-    FOREIGN KEY (maaleenhet_id) REFERENCES Maaleenheter(id)
+    FOREIGN KEY (maaleenhet_id) REFERENCES Maaleenheter(id),
+    FOREIGN KEY (user_id) REFERENCES Brukere(id)
 );
 
 -- =========================
@@ -209,22 +212,15 @@ CREATE TABLE Skjuloppskrift (
     user_id BIGINT UNSIGNED NOT NULL,
     begrunnelse VARCHAR(255),
     kommentar TEXT,
+    skjul BOOLEAN NOT NULL DEFAULT TRUE,
+    karakter INT NULL,
+
+    UNIQUE (user_id, oppskrift_id),
 
     FOREIGN KEY (oppskrift_id) REFERENCES Oppskrifter(id),
-    FOREIGN KEY (user_id) REFERENCES Brukere(id)
-);
+    FOREIGN KEY (user_id) REFERENCES Brukere(id),
 
-CREATE TABLE OppskriftVurderinger (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    oppskrift_id BIGINT UNSIGNED NOT NULL,
-    husholdning_id BIGINT UNSIGNED NOT NULL,
-    rating ENUM("A", "B", "C", "F") NOT NULL DEFAULT "C",
-    updated_at DATETIME NULL,
-
-    UNIQUE (oppskrift_id, husholdning_id),
-
-    FOREIGN KEY (oppskrift_id) REFERENCES Oppskrifter(id),
-    FOREIGN KEY (husholdning_id) REFERENCES Husholdning(id)
+    CHECK (karakter IS NULL OR (karakter BETWEEN 1 AND 10))
 );
 
 -- =========================

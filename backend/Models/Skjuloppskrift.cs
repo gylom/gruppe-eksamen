@@ -21,6 +21,12 @@ public class Skjuloppskrift
     [Column("kommentar")]
     public string? Kommentar { get; set; }
 
+    [Column("skjul")]
+    public bool Skjul { get; set; } = true;
+
+    [Column("karakter")]
+    public int? Karakter { get; set; }
+
     public Oppskrift? Oppskrift { get; set; }
     public Bruker? Bruker { get; set; }
 }

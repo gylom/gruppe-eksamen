@@ -4,6 +4,7 @@ using DefaultNamespace.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace DefaultNamespace.Controllers;
 
@@ -18,7 +19,13 @@ public class VarerController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? sok, [FromQuery] ulong? kategori, [FromQuery] ulong? varetypeId)
     {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var householdMemberIds = await GetHouseholdMemberIds(userId.Value);
+
         var query = _db.Varer
+            .Where(x => !x.Brukerdefinert || x.UserId == null || householdMemberIds.Contains(x.UserId.Value))
             .Include(x => x.Varetype)!.ThenInclude(x => x!.Kategori)
             .Include(x => x.Maaleenhet)
             .AsQueryable();
@@ -28,7 +35,7 @@ public class VarerController : ControllerBase
             var search = sok.Trim().ToLower();
             query = query.Where(x => x.Varenavn.ToLower().Contains(search)
                                      || x.Merke.ToLower().Contains(search)
-                                     || x.Ean.Contains(search)
+                                     || (x.Ean != null && x.Ean.Contains(search))
                                      || x.Varetype!.Navn.ToLower().Contains(search));
         }
 
@@ -52,7 +59,9 @@ public class VarerController : ControllerBase
                 kvantitet = x.Kvantitet,
                 maaleenhet_id = x.MaaleenhetId,
                 maaleenhet = x.Maaleenhet!.Enhet,
-                ean = x.Ean
+                ean = x.Ean,
+                brukerdefinert = x.Brukerdefinert,
+                user_id = x.UserId
             })
             .ToListAsync();
 
@@ -62,10 +71,15 @@ public class VarerController : ControllerBase
     [HttpGet("{id:long}")]
     public async Task<IActionResult> GetOne(ulong id)
     {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var householdMemberIds = await GetHouseholdMemberIds(userId.Value);
+
         var item = await _db.Varer
             .Include(x => x.Varetype)!.ThenInclude(x => x!.Kategori)
             .Include(x => x.Maaleenhet)
-            .Where(x => x.Id == id)
+            .Where(x => x.Id == id && (!x.Brukerdefinert || x.UserId == null || householdMemberIds.Contains(x.UserId.Value)))
             .Select(x => new
             {
                 id = x.Id,
@@ -78,7 +92,9 @@ public class VarerController : ControllerBase
                 kvantitet = x.Kvantitet,
                 maaleenhet_id = x.MaaleenhetId,
                 maaleenhet = x.Maaleenhet!.Enhet,
-                ean = x.Ean
+                ean = x.Ean,
+                brukerdefinert = x.Brukerdefinert,
+                user_id = x.UserId
             })
             .FirstOrDefaultAsync();
 
@@ -88,6 +104,9 @@ public class VarerController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create(CreateProductRequest request)
     {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
         if (string.IsNullOrWhiteSpace(request.Varenavn))
             return BadRequest(new { message = "Varenavn må fylles ut." });
 
@@ -106,16 +125,35 @@ public class VarerController : ControllerBase
             Merke = request.Merke?.Trim() ?? string.Empty,
             Kvantitet = request.Kvantitet ?? 0,
             MaaleenhetId = request.MaaleenhetId,
-            Ean = request.Ean?.Trim() ?? string.Empty
+            Ean = string.IsNullOrWhiteSpace(request.Ean) ? null : request.Ean.Trim(),
+            UserId = userId.Value,
+            Brukerdefinert = true
         };
 
         _db.Varer.Add(vare);
         await _db.SaveChangesAsync();
 
-        return Ok(new
-        {
-            message = "Vare opprettet.",
-            id = vare.Id
-        });
+        return Ok(new { message = "Vare opprettet.", id = vare.Id });
+    }
+
+    private ulong? GetUserId()
+    {
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return ulong.TryParse(claim, out var id) ? id : null;
+    }
+
+    private async Task<List<ulong>> GetHouseholdMemberIds(ulong userId)
+    {
+        var householdId = await _db.Medlemmer
+            .Where(x => x.UserId == userId)
+            .Select(x => (ulong?)x.HusholdningId)
+            .FirstOrDefaultAsync();
+
+        if (householdId == null) return new List<ulong> { userId };
+
+        return await _db.Medlemmer
+            .Where(x => x.HusholdningId == householdId.Value)
+            .Select(x => x.UserId)
+            .ToListAsync();
     }
 }

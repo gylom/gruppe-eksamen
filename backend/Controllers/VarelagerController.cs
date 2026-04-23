@@ -105,8 +105,15 @@ public class VarelagerController : ControllerBase
         var householdId = GetHouseholdId();
         if (householdId == null) return BadRequest(new { message = "Brukeren er ikke medlem av husholdning." });
 
-        var vare = await _db.Varer.FirstOrDefaultAsync(x => x.Id == request.VareId);
-        if (vare == null) return NotFound(new { message = "Vare ikke funnet." });
+        var householdMemberIds = await _db.Medlemmer
+            .Where(x => x.HusholdningId == householdId.Value)
+            .Select(x => x.UserId)
+            .ToListAsync();
+
+        var vare = await _db.Varer.FirstOrDefaultAsync(x =>
+            x.Id == request.VareId &&
+            (!x.Brukerdefinert || x.UserId == null || householdMemberIds.Contains(x.UserId.Value)));
+        if (vare == null) return NotFound(new { message = "Vare ikke funnet eller ikke tilgjengelig for husholdningen." });
 
         var row = new VarelagerRad
         {

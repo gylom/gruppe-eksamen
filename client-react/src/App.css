@@ -435,29 +435,36 @@ li + li {
     min-width: 640px;
   }
 }
-.nested-section-head {
-  margin-top: 24px;
+
+.recipe-tools {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.03);
 }
 
-.tier-actions {
+.rating-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: 12px 0 14px;
+  gap: 6px;
 }
 
-.tier-button {
-  padding: 8px 12px;
-  border-radius: 999px;
-  font-size: 0.9rem;
+.rating-row button {
+  min-width: 34px;
+  padding: 7px 9px;
 }
 
-.tier-button.active {
-  background: linear-gradient(135deg, #0f172a, #1e293b);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+button.active,
+button.secondary.active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+  font-weight: 700;
 }
 
-.muted-card {
-  opacity: 0.92;
-  border-style: dashed;
+.muted {
+  color: #64748b;
+  margin: 0;
 }
