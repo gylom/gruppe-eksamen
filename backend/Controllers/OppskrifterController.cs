@@ -21,7 +21,7 @@ public class OppskrifterController : ControllerBase
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
-        var householdMemberIds = await GetHouseholdMemberIds();
+        var visibleOwnerIds = await GetVisibleRecipeOwnerIds(userId.Value);
         var preferenceLookup = await GetPreferenceLookup(userId.Value);
 
         var hiddenIds = preferenceLookup
@@ -30,7 +30,7 @@ public class OppskrifterController : ControllerBase
             .ToList();
 
         var query = _db.Oppskrifter
-            .Where(x => (x.UserId == userId.Value || householdMemberIds.Contains(x.UserId)) && !hiddenIds.Contains(x.Id))
+            .Where(x => visibleOwnerIds.Contains(x.UserId) && !hiddenIds.Contains(x.Id))
             .Include(x => x.Ingredienser)!.ThenInclude(x => x.Varetype)
             .Include(x => x.Ingredienser)!.ThenInclude(x => x.Maaleenhet)
             .AsQueryable();
@@ -52,7 +52,7 @@ public class OppskrifterController : ControllerBase
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
-        var householdMemberIds = await GetHouseholdMemberIds();
+        var visibleOwnerIds = await GetVisibleRecipeOwnerIds(userId.Value);
         var preferenceLookup = await GetPreferenceLookup(userId.Value);
 
         var hiddenIds = preferenceLookup
@@ -63,7 +63,7 @@ public class OppskrifterController : ControllerBase
         if (hiddenIds.Count == 0) return Ok(new List<object>());
 
         var recipes = await _db.Oppskrifter
-            .Where(x => hiddenIds.Contains(x.Id) && (x.UserId == userId.Value || householdMemberIds.Contains(x.UserId)))
+            .Where(x => hiddenIds.Contains(x.Id) && visibleOwnerIds.Contains(x.UserId))
             .Include(x => x.Ingredienser)!.ThenInclude(x => x.Varetype)
             .Include(x => x.Ingredienser)!.ThenInclude(x => x.Maaleenhet)
             .OrderByDescending(x => x.CreatedAt)
@@ -78,11 +78,11 @@ public class OppskrifterController : ControllerBase
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
-        var householdMemberIds = await GetHouseholdMemberIds();
+        var visibleOwnerIds = await GetVisibleRecipeOwnerIds(userId.Value);
         var preferenceLookup = await GetPreferenceLookup(userId.Value);
 
         var item = await _db.Oppskrifter
-            .Where(x => x.Id == id && (x.UserId == userId.Value || householdMemberIds.Contains(x.UserId)))
+            .Where(x => x.Id == id && visibleOwnerIds.Contains(x.UserId))
             .Include(x => x.Ingredienser)!.ThenInclude(x => x.Varetype)
             .Include(x => x.Ingredienser)!.ThenInclude(x => x.Maaleenhet)
             .FirstOrDefaultAsync();
@@ -162,13 +162,9 @@ public class OppskrifterController : ControllerBase
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
-        var householdMemberIds = await GetHouseholdMemberIds();
-
         var recipe = await _db.Oppskrifter
             .Include(x => x.Ingredienser)
-            .FirstOrDefaultAsync(x =>
-                x.Id == id &&
-                (x.UserId == userId.Value || householdMemberIds.Contains(x.UserId)));
+            .FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId.Value);
 
         if (recipe == null)
             return NotFound(new { message = "Oppskrift ikke funnet." });
@@ -196,10 +192,10 @@ public class OppskrifterController : ControllerBase
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
-        var householdMemberIds = await GetHouseholdMemberIds();
+        var visibleOwnerIds = await GetVisibleRecipeOwnerIds(userId.Value);
 
         var recipeExists = await _db.Oppskrifter
-            .AnyAsync(x => x.Id == id && (x.UserId == userId.Value || householdMemberIds.Contains(x.UserId)));
+            .AnyAsync(x => x.Id == id && visibleOwnerIds.Contains(x.UserId));
 
         if (!recipeExists) return NotFound(new { message = "Oppskrift ikke funnet." });
 
@@ -264,7 +260,7 @@ public class OppskrifterController : ControllerBase
         if (userId == null || householdId == null)
             return BadRequest(new { message = "Manglende bruker/husholdning." });
 
-        var householdMemberIds = await GetHouseholdMemberIds();
+        var visibleOwnerIds = await GetVisibleRecipeOwnerIds(userId.Value);
         var preferenceLookup = await GetPreferenceLookup(userId.Value);
 
         var hiddenIds = preferenceLookup
@@ -279,7 +275,7 @@ public class OppskrifterController : ControllerBase
             .ToListAsync();
 
         var recipes = await _db.Oppskrifter
-            .Where(x => (x.UserId == userId.Value || householdMemberIds.Contains(x.UserId)) && !hiddenIds.Contains(x.Id))
+            .Where(x => visibleOwnerIds.Contains(x.UserId) && !hiddenIds.Contains(x.Id))
             .Include(x => x.Ingredienser)!.ThenInclude(x => x.Varetype)
             .ToListAsync();
 
@@ -320,6 +316,7 @@ public class OppskrifterController : ControllerBase
                 manglendeIngredienser = missing
             };
         })
+        .Where(x => x.matchProsent > 30)
         .OrderByDescending(x => x.matchProsent)
         .ThenByDescending(x => x.karakter ?? 0)
         .ThenBy(x => x.antallDuMangler)
@@ -387,6 +384,22 @@ public class OppskrifterController : ControllerBase
             .Where(x => x.HusholdningId == householdId.Value)
             .Select(x => x.UserId)
             .ToListAsync();
+    }
+
+    private async Task<List<ulong>> GetVisibleRecipeOwnerIds(ulong userId)
+    {
+        var householdMemberIds = await GetHouseholdMemberIds();
+
+        var adminUserIds = await _db.Brukere
+            .Where(x => x.Rolle)
+            .Select(x => x.Id)
+            .ToListAsync();
+
+        return householdMemberIds
+            .Append(userId)
+            .Concat(adminUserIds)
+            .Distinct()
+            .ToList();
     }
 }
 
