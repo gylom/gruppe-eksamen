@@ -297,7 +297,16 @@ public class OppskrifterController : ControllerBase
                 .ToList();
 
             var pref = preferenceLookup.GetValueOrDefault(r.Id);
+var matchProsent = required.Count == 0
+    ? 100
+    : (int)Math.Round((double)have / required.Count * 100);
 
+string melding =
+    matchProsent == 100 ? "Alle ingredienser på lager" :
+    matchProsent >= 70 ? "Nesten alle ingredienser på lager" :
+    matchProsent >= 50 ? "Mangler noen ingredienser" :
+    "Du har noen ingredienser på lager";
+    
             return new
             {
                 id = r.Id,
@@ -306,6 +315,7 @@ public class OppskrifterController : ControllerBase
                 karakter = pref?.Karakter,
                 kommentar = pref?.Kommentar,
                 skjul = pref?.Skjul ?? false,
+                melding = melding,
                 antallIngredienser = required.Count,
                 antallDuHar = have,
                 antallDuMangler = missing.Count,
