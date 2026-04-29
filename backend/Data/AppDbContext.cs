@@ -16,6 +16,8 @@ public class AppDbContext : DbContext
     public DbSet<Varetype> Varetyper => Set<Varetype>();
     public DbSet<Maaleenhet> Maaleenheter => Set<Maaleenhet>();
     public DbSet<Vare> Varer => Set<Vare>();
+    public DbSet<Butikk> Butikker => Set<Butikk>();
+    public DbSet<Butikkpris> Butikkpriser => Set<Butikkpris>();
     public DbSet<Husholdningsinnstilling> Husholdningsinnstillinger => Set<Husholdningsinnstilling>();
     public DbSet<Plassering> Plasseringer => Set<Plassering>();
     public DbSet<VarelagerRad> Varelager => Set<VarelagerRad>();
@@ -35,6 +37,8 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Varetype>().ToTable("Varetyper");
         modelBuilder.Entity<Maaleenhet>().ToTable("Maaleenheter");
         modelBuilder.Entity<Vare>().ToTable("Varer");
+        modelBuilder.Entity<Butikk>().ToTable("Butikker");
+        modelBuilder.Entity<Butikkpris>().ToTable("Butikkpriser");
         modelBuilder.Entity<Husholdningsinnstilling>().ToTable("Husholdningsinnstillinger");
         modelBuilder.Entity<Plassering>().ToTable("Plassering");
         modelBuilder.Entity<VarelagerRad>().ToTable("Varelager");
@@ -80,6 +84,47 @@ public class AppDbContext : DbContext
             .HasOne(x => x.Bruker)
             .WithMany()
             .HasForeignKey(x => x.UserId);
+        modelBuilder.Entity<Butikk>()
+    .Property(x => x.Butikknavn)
+    .HasColumnName("butikknavn");
+
+        modelBuilder.Entity<Butikkpris>()
+            .Property(x => x.VareId)
+            .HasColumnName("vare_id");
+
+        modelBuilder.Entity<Butikkpris>()
+            .Property(x => x.ButikkId)
+            .HasColumnName("butikk_id");
+
+        modelBuilder.Entity<Butikkpris>()
+            .Property(x => x.Pris)
+            .HasColumnName("pris");
+
+        modelBuilder.Entity<Butikkpris>()
+            .Property(x => x.Datopris)
+            .HasColumnName("datopris");
+
+        modelBuilder.Entity<Butikkpris>()
+            .Property(x => x.Tilbudspris)
+            .HasColumnName("tilbudspris");
+
+        modelBuilder.Entity<Butikkpris>()
+            .Property(x => x.Tilbudfradato)
+            .HasColumnName("tilbudfradato");
+
+        modelBuilder.Entity<Butikkpris>()
+            .Property(x => x.Tilbudtildato)
+            .HasColumnName("tilbudtildato");
+
+        modelBuilder.Entity<Butikkpris>()
+            .HasOne(x => x.Vare)
+            .WithMany(x => x.Butikkpriser)
+            .HasForeignKey(x => x.VareId);
+
+        modelBuilder.Entity<Butikkpris>()
+            .HasOne(x => x.Butikk)
+            .WithMany(x => x.Butikkpriser)
+            .HasForeignKey(x => x.ButikkId);
 
         modelBuilder.Entity<Husholdningsinnstilling>()
             .HasOne(x => x.Husholdning)

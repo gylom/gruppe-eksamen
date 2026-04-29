@@ -28,15 +28,18 @@ public class VarerController : ControllerBase
             .Where(x => !x.Brukerdefinert || x.UserId == null || householdMemberIds.Contains(x.UserId.Value))
             .Include(x => x.Varetype)!.ThenInclude(x => x!.Kategori)
             .Include(x => x.Maaleenhet)
+            .Include(x => x.Butikkpriser)
+                .ThenInclude(x => x.Butikk)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(sok))
         {
             var search = sok.Trim().ToLower();
-            query = query.Where(x => x.Varenavn.ToLower().Contains(search)
-                                     || x.Merke.ToLower().Contains(search)
-                                     || (x.Ean != null && x.Ean.Contains(search))
-                                     || x.Varetype!.Navn.ToLower().Contains(search));
+            query = query.Where(x =>
+                x.Varenavn.ToLower().Contains(search) ||
+                x.Merke.ToLower().Contains(search) ||
+                (x.Ean != null && x.Ean.Contains(search)) ||
+                x.Varetype!.Navn.ToLower().Contains(search));
         }
 
         if (kategori.HasValue)
@@ -61,7 +64,21 @@ public class VarerController : ControllerBase
                 maaleenhet = x.Maaleenhet!.Enhet,
                 ean = x.Ean,
                 brukerdefinert = x.Brukerdefinert,
-                user_id = x.UserId
+                user_id = x.UserId,
+
+                butikker = x.Butikkpriser
+                    .OrderBy(bp => bp.Pris)
+                    .Select(bp => new
+                    {
+                        butikk_id = bp.ButikkId,
+                        butikk = bp.Butikk.Butikknavn,
+                        pris = bp.Pris,
+                        datopris = bp.Datopris,
+                        tilbudspris = bp.Tilbudspris,
+                        tilbud_fra = bp.Tilbudfradato,
+                        tilbud_til = bp.Tilbudtildato
+                    })
+                    .ToList()
             })
             .ToListAsync();
 
@@ -77,9 +94,11 @@ public class VarerController : ControllerBase
         var householdMemberIds = await GetHouseholdMemberIds(userId.Value);
 
         var item = await _db.Varer
+            .Where(x => x.Id == id && (!x.Brukerdefinert || x.UserId == null || householdMemberIds.Contains(x.UserId.Value)))
             .Include(x => x.Varetype)!.ThenInclude(x => x!.Kategori)
             .Include(x => x.Maaleenhet)
-            .Where(x => x.Id == id && (!x.Brukerdefinert || x.UserId == null || householdMemberIds.Contains(x.UserId.Value)))
+            .Include(x => x.Butikkpriser)
+                .ThenInclude(x => x.Butikk)
             .Select(x => new
             {
                 id = x.Id,
@@ -94,7 +113,21 @@ public class VarerController : ControllerBase
                 maaleenhet = x.Maaleenhet!.Enhet,
                 ean = x.Ean,
                 brukerdefinert = x.Brukerdefinert,
-                user_id = x.UserId
+                user_id = x.UserId,
+
+                butikker = x.Butikkpriser
+                    .OrderBy(bp => bp.Pris)
+                    .Select(bp => new
+                    {
+                        butikk_id = bp.ButikkId,
+                        butikk = bp.Butikk.Butikknavn,
+                        pris = bp.Pris,
+                        datopris = bp.Datopris,
+                        tilbudspris = bp.Tilbudspris,
+                        tilbud_fra = bp.Tilbudfradato,
+                        tilbud_til = bp.Tilbudtildato
+                    })
+                    .ToList()
             })
             .FirstOrDefaultAsync();
 
@@ -118,6 +151,16 @@ public class VarerController : ControllerBase
         if (!unitExists)
             return NotFound(new { message = "Måleenhet ikke funnet." });
 
+        if (request.ButikkId.HasValue)
+        {
+            var butikkExists = await _db.Butikker.AnyAsync(x => x.Id == request.ButikkId.Value);
+            if (!butikkExists)
+                return NotFound(new { message = "Butikk ikke funnet." });
+
+            if (!request.Pris.HasValue)
+                return BadRequest(new { message = "Pris må oppgis når butikk er satt." });
+        }
+
         var vare = new Vare
         {
             Varenavn = request.Varenavn.Trim(),
@@ -133,7 +176,28 @@ public class VarerController : ControllerBase
         _db.Varer.Add(vare);
         await _db.SaveChangesAsync();
 
-        return Ok(new { message = "Vare opprettet.", id = vare.Id });
+        if (request.ButikkId.HasValue && request.Pris.HasValue)
+        {
+            var butikkpris = new Butikkpris
+            {
+                VareId = vare.Id,
+                ButikkId = request.ButikkId.Value,
+                Pris = request.Pris.Value,
+                Datopris = request.Datopris ?? DateOnly.FromDateTime(DateTime.UtcNow),
+                Tilbudspris = request.Tilbudspris,
+                Tilbudfradato = request.TilbudFra,
+                Tilbudtildato = request.TilbudTil
+            };
+
+            _db.Butikkpriser.Add(butikkpris);
+            await _db.SaveChangesAsync();
+        }
+
+        return Ok(new
+        {
+            message = "Vare opprettet.",
+            id = vare.Id
+        });
     }
 
     private ulong? GetUserId()
@@ -149,7 +213,8 @@ public class VarerController : ControllerBase
             .Select(x => (ulong?)x.HusholdningId)
             .FirstOrDefaultAsync();
 
-        if (householdId == null) return new List<ulong> { userId };
+        if (householdId == null)
+            return new List<ulong> { userId };
 
         return await _db.Medlemmer
             .Where(x => x.HusholdningId == householdId.Value)

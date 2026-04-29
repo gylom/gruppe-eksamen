@@ -36,4 +36,5 @@ public class Vare
     public Varetype? Varetype { get; set; }
     public Maaleenhet? Maaleenhet { get; set; }
     public Bruker? Bruker { get; set; }
+    public ICollection<Butikkpris> Butikkpriser { get; set; } = new List<Butikkpris>();
 }
