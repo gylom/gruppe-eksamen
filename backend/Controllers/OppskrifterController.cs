@@ -31,6 +31,7 @@ public class OppskrifterController : ControllerBase
 
         var query = _db.Oppskrifter
             .Where(x => visibleOwnerIds.Contains(x.UserId) && !hiddenIds.Contains(x.Id))
+            .Include(x => x.Kategori)
             .Include(x => x.Ingredienser)!.ThenInclude(x => x.Varetype)
             .Include(x => x.Ingredienser)!.ThenInclude(x => x.Maaleenhet)
             .AsQueryable();
@@ -64,6 +65,7 @@ public class OppskrifterController : ControllerBase
 
         var recipes = await _db.Oppskrifter
             .Where(x => hiddenIds.Contains(x.Id) && visibleOwnerIds.Contains(x.UserId))
+            .Include(x => x.Kategori)
             .Include(x => x.Ingredienser)!.ThenInclude(x => x.Varetype)
             .Include(x => x.Ingredienser)!.ThenInclude(x => x.Maaleenhet)
             .OrderByDescending(x => x.CreatedAt)
@@ -83,6 +85,7 @@ public class OppskrifterController : ControllerBase
 
         var item = await _db.Oppskrifter
             .Where(x => x.Id == id && visibleOwnerIds.Contains(x.UserId))
+            .Include(x => x.Kategori)
             .Include(x => x.Ingredienser)!.ThenInclude(x => x.Varetype)
             .Include(x => x.Ingredienser)!.ThenInclude(x => x.Maaleenhet)
             .FirstOrDefaultAsync();
@@ -91,6 +94,7 @@ public class OppskrifterController : ControllerBase
             ? NotFound(new { message = "Oppskrift ikke funnet." })
             : Ok(MapRecipe(item, preferenceLookup.GetValueOrDefault(item.Id)));
     }
+
 
     [HttpPost("api/oppskrifter")]
     public async Task<IActionResult> Create(CreateRecipeRequest request)
@@ -104,6 +108,7 @@ public class OppskrifterController : ControllerBase
             Instruksjoner = request.Instruksjoner,
             Porsjoner = request.Porsjoner,
             Bilde = request.Bilde,
+            KategoriId = request.KategoriId,
             UserId = userId.Value,
             CreatedAt = DateTime.UtcNow,
             Ingredienser = request.Ingredienser.Select(i => new Ingrediens
@@ -138,6 +143,7 @@ public class OppskrifterController : ControllerBase
         item.Instruksjoner = request.Instruksjoner;
         item.Porsjoner = request.Porsjoner;
         item.Bilde = request.Bilde;
+        item.KategoriId = request.KategoriId;
 
         _db.Ingredienser.RemoveRange(item.Ingredienser);
 
@@ -276,6 +282,7 @@ public class OppskrifterController : ControllerBase
 
         var recipes = await _db.Oppskrifter
             .Where(x => visibleOwnerIds.Contains(x.UserId) && !hiddenIds.Contains(x.Id))
+            .Include(x => x.Kategori)
             .Include(x => x.Ingredienser)!.ThenInclude(x => x.Varetype)
             .ToListAsync();
 
@@ -312,6 +319,8 @@ string melding =
                 id = r.Id,
                 navn = r.Navn,
                 porsjoner = r.Porsjoner,
+                kategori_id = r.KategoriId,
+                kategori = r.Kategori != null ? r.Kategori.Navn : null,
                 karakter = pref?.Karakter,
                 kommentar = pref?.Kommentar,
                 skjul = pref?.Skjul ?? false,
@@ -352,6 +361,8 @@ string melding =
             instruksjoner = x.Instruksjoner,
             porsjoner = x.Porsjoner,
             bilde = x.Bilde,
+            kategori_id = x.KategoriId,
+            kategori = x.Kategori != null ? x.Kategori.Navn : null,
             user_id = x.UserId,
             karakter = preference?.Karakter,
             kommentar = preference?.Kommentar,

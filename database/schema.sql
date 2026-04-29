@@ -178,6 +178,14 @@ CREATE TABLE Forbruk (
 );
 
 -- =========================
+-- OPPSKRIFTSKATEGORIER
+-- =========================
+CREATE TABLE Oppskriftskategorier (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    navn VARCHAR(100) NOT NULL UNIQUE
+);
+
+-- =========================
 -- OPPSKRIFTER
 -- =========================
 CREATE TABLE Oppskrifter (
@@ -186,10 +194,12 @@ CREATE TABLE Oppskrifter (
     instruksjoner TEXT NOT NULL,
     porsjoner INT NOT NULL,
     user_id BIGINT UNSIGNED NOT NULL,
+    kategori_id BIGINT UNSIGNED,
     bilde VARCHAR(255),
     created_at DATETIME,
 
-    FOREIGN KEY (user_id) REFERENCES Brukere(id)
+    FOREIGN KEY (user_id) REFERENCES Brukere(id),
+    FOREIGN KEY (kategori_id) REFERENCES Oppskriftskategorier(id)
 );
 
 CREATE TABLE Ingredienser (

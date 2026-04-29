@@ -35,6 +35,7 @@ docker exec matlager-mysql mysql -h 127.0.0.1 -uroot -proot -e "DROP DATABASE IF
 
 files=(
   schema.sql
+  Oppskriftskategorier-seed.sql
   Varekategori-seed.sql
   Varetyper-seed.sql
   Maaleenheter-seed.sql

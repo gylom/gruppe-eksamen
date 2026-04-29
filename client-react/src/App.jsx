@@ -27,6 +27,7 @@ export default function App() {
   const [units, setUnits] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [recipes, setRecipes] = useState([]);
+  const [recipeCategories, setRecipeCategories] = useState([]);
   const [recommendedRecipes, setRecommendedRecipes] = useState([]);
   const [hiddenRecipes, setHiddenRecipes] = useState([]);
   const [recommendedSortMode, setRecommendedSortMode] = useState("match");
@@ -67,6 +68,7 @@ export default function App() {
 
   const [recipeForm, setRecipeForm] = useState({
     name: "",
+    categoryId: "",
     instructions: "",
     servings: 1,
     imageUrl: "",
@@ -386,6 +388,16 @@ export default function App() {
     }
   }
 
+  async function loadRecipeCategories() {
+    try {
+      const res = await api.get("/oppskriftskategorier", { headers: authHeaders });
+      setRecipeCategories(res.data);
+    } catch (err) {
+      console.error(err);
+      showError("Kunne ikke hente oppskriftskategorier.");
+    }
+  }
+
   async function loadRecipes() {
     try {
       const res = await api.get("/oppskrifter", { headers: authHeaders });
@@ -449,6 +461,7 @@ export default function App() {
         navn: recipeForm.name,
         instruksjoner: recipeForm.instructions,
         porsjoner: Number(recipeForm.servings),
+        kategoriId: recipeForm.categoryId ? Number(recipeForm.categoryId) : null,
         bilde: recipeForm.imageUrl || null,
         ingredienser: recipeForm.ingredients
             .filter((ingredient) => ingredient.productTypeId)
@@ -467,6 +480,7 @@ export default function App() {
 
       setRecipeForm({
         name: "",
+        categoryId: "",
         instructions: "",
         servings: 1,
         imageUrl: "",
@@ -889,6 +903,7 @@ export default function App() {
     loadProductTypes();
     loadProducts();
     loadInventory();
+    loadRecipeCategories();
     loadRecipes();
     loadRecommendedRecipes();
     loadHiddenRecipes();
@@ -1651,7 +1666,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid two">
+                <div className="grid three">
                   <label>
                     Navn
                     <input
@@ -1665,6 +1680,20 @@ export default function App() {
                         value={recipeForm.servings}
                         onChange={(e) => setRecipeForm({ ...recipeForm, servings: e.target.value })}
                     />
+                  </label>
+                  <label>
+                    Kategori
+                    <select
+                        value={recipeForm.categoryId}
+                        onChange={(e) => setRecipeForm({ ...recipeForm, categoryId: e.target.value })}
+                    >
+                      <option value="">Velg kategori</option>
+                      {recipeCategories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.navn}
+                          </option>
+                      ))}
+                    </select>
                   </label>
                 </div>
 
@@ -1750,6 +1779,7 @@ export default function App() {
                       <article className="mini-card" key={recipe.id}>
                         <h3>{recipe.navn}</h3>
                         <p>{recipe.porsjoner} porsjoner</p>
+                        <p className="muted">Kategori: {recipe.kategori || "Ikke valgt"}</p>
                         {renderRecipeActions(recipe)}
                         <ul>
                           {recipe.ingredienser?.map((ingredient) => (
@@ -1811,6 +1841,7 @@ export default function App() {
                       <article className="mini-card" key={recipe.id}>
                         <h3>{recipe.navn}</h3>
                         <p>Match: {recipe.matchProsent}%</p>
+                        <p className="muted">Kategori: {recipe.kategori || "Ikke valgt"}</p>
                         <p>Karakter: {recipe.karakter ?? "Ikke vurdert"}/10</p>
                         {renderRecipeActions(recipe)}
                         <p>

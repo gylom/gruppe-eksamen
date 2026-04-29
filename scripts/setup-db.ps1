@@ -62,6 +62,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $files = @(
     "schema.sql",
+    "Oppskriftskategorier-seed.sql",
     "Varekategori-seed.sql",
     "Varetyper-seed.sql",
     "Maaleenheter-seed.sql",

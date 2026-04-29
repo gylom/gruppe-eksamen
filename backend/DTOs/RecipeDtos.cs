@@ -15,6 +15,7 @@ public class CreateRecipeRequest
     public string Instruksjoner { get; set; } = string.Empty;
     public int Porsjoner { get; set; }
     public string? Bilde { get; set; }
+    public ulong? KategoriId { get; set; }
     public List<RecipeIngredientInput> Ingredienser { get; set; } = new();
 }
 

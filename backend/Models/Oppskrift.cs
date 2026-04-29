@@ -23,10 +23,14 @@ public class Oppskrift
 
     [Column("bilde")]
     public string? Bilde { get; set; }
+    
+    [Column("kategori_id")]
+    public ulong? KategoriId { get; set; }
 
     [Column("created_at")]
     public DateTime? CreatedAt { get; set; }
 
     public Bruker? Bruker { get; set; }
     public ICollection<Ingrediens> Ingredienser { get; set; } = new List<Ingrediens>();
+    public Oppskriftskategori? Kategori { get; set; }
 }

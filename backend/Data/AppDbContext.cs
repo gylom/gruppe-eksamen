@@ -22,6 +22,7 @@ public class AppDbContext : DbContext
     public DbSet<HandlelisteRad> Handleliste => Set<HandlelisteRad>();
     public DbSet<ForbrukRad> Forbruk => Set<ForbrukRad>();
     public DbSet<Oppskrift> Oppskrifter => Set<Oppskrift>();
+    public DbSet<Oppskriftskategori> Oppskriftskategorier => Set<Oppskriftskategori>();
     public DbSet<Ingrediens> Ingredienser => Set<Ingrediens>();
     public DbSet<Skjuloppskrift> Skjuloppskrifter => Set<Skjuloppskrift>();
 
@@ -40,6 +41,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<HandlelisteRad>().ToTable("Handleliste");
         modelBuilder.Entity<ForbrukRad>().ToTable("Forbruk");
         modelBuilder.Entity<Oppskrift>().ToTable("Oppskrifter");
+        modelBuilder.Entity<Oppskriftskategori>().ToTable("Oppskriftskategorier");
         modelBuilder.Entity<Ingrediens>().ToTable("Ingredienser");
         modelBuilder.Entity<Skjuloppskrift>().ToTable("Skjuloppskrift");
         modelBuilder.Entity<Skjuloppskrift>().HasIndex(x => new { x.UserId, x.OppskriftId }).IsUnique();
