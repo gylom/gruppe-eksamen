@@ -6,6 +6,7 @@ import {
   TrailingActions,
   Type,
 } from "react-swipeable-list"
+import { useTranslation } from "react-i18next"
 
 import { Button } from "~/components/ui/button"
 import { cn } from "~/lib/utils"
@@ -36,11 +37,12 @@ export function SwipeActionRow({
   actionSide = "trailing",
   className,
 }: SwipeActionRowProps) {
+  const { t } = useTranslation()
   const blocked = disabled || loading
   const action = (
     <SwipeAction onClick={() => !blocked && onAction()}>
       <span className="flex h-full min-w-[5rem] items-center justify-center px-3 text-sm font-medium">
-        {loading ? "..." : actionLabel}
+        {loading ? t("common.busyEllipsis") : actionLabel}
       </span>
     </SwipeAction>
   )
@@ -73,7 +75,7 @@ export function SwipeActionRow({
               if (!blocked) onAction()
             }}
           >
-            {loading ? "..." : actionLabel}
+            {loading ? t("common.busyEllipsis") : actionLabel}
           </Button>
         </div>
       </SwipeableListItem>

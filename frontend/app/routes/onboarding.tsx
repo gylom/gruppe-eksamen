@@ -14,7 +14,6 @@ import { useLogout } from "~/features/auth/use-logout"
 import { useMe } from "~/features/auth/use-me"
 import { normalizeInviteInput } from "~/features/household/invite-input"
 import { useCreateHousehold, useJoinHousehold } from "~/features/household/use-household"
-import { ApiError } from "~/lib/api-fetch"
 import { getToken } from "~/lib/auth"
 
 type CreateValues = { navn: string }
@@ -92,9 +91,8 @@ export default function OnboardingRoute() {
     try {
       await createHousehold.mutateAsync({ navn: values.navn.trim() })
       await refreshMeAndGoApp(t("onboarding.toastCreated"))
-    } catch (err) {
-      const msg = err instanceof ApiError ? err.message : t("onboarding.oops")
-      createForm.setError("root", { message: msg })
+    } catch {
+      createForm.setError("root", { message: t("onboarding.oops") })
     }
   }
 
@@ -103,9 +101,8 @@ export default function OnboardingRoute() {
     try {
       await joinHousehold.mutateAsync({ code: values.code })
       await refreshMeAndGoApp(t("onboarding.toastJoined"))
-    } catch (err) {
-      const msg = err instanceof ApiError ? err.message : t("onboarding.oops")
-      joinForm.setError("root", { message: msg })
+    } catch {
+      joinForm.setError("root", { message: t("onboarding.oops") })
     }
   }
 

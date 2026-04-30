@@ -9,10 +9,14 @@ export function LanguagePreferenceControl() {
   const { t, i18n: i18nInstance } = useTranslation()
   const current = (i18nInstance.language.startsWith("en") ? "en" : "nb") as AppLanguage
 
-  function select(next: AppLanguage) {
+  async function select(next: AppLanguage) {
     if (next === current) return
-    void i18nInstance.changeLanguage(next)
-    toast.success(t("preferences.languageApplied"))
+    try {
+      await i18nInstance.changeLanguage(next)
+      toast.success(i18nInstance.getFixedT(next)("preferences.languageApplied"))
+    } catch {
+      toast.error(t("common.genericError"))
+    }
   }
 
   return (
@@ -31,7 +35,7 @@ export function LanguagePreferenceControl() {
           aria-checked={current === "nb"}
           variant={current === "nb" ? "secondary" : "outline"}
           className={cn("min-h-11 min-w-0 flex-1 shrink px-2 text-center")}
-          onClick={() => select("nb")}
+          onClick={() => void select("nb")}
         >
           {t("preferences.languageNb")}
         </Button>
@@ -41,7 +45,7 @@ export function LanguagePreferenceControl() {
           aria-checked={current === "en"}
           variant={current === "en" ? "secondary" : "outline"}
           className={cn("min-h-11 min-w-0 flex-1 shrink px-2 text-center")}
-          onClick={() => select("en")}
+          onClick={() => void select("en")}
         >
           {t("preferences.languageEn")}
         </Button>

@@ -1,18 +1,19 @@
 import { useEffect, useState } from "react"
 
 import type { UseMutationResult } from "@tanstack/react-query"
+import { useTranslation } from "react-i18next"
 
 import { Button } from "~/components/ui/button"
 import { Label } from "~/components/ui/label"
 import type { RecipeCategoryDto } from "~/features/recipes/types"
-import { ApiError } from "~/lib/api-fetch"
 import {
   addWeeksToMondayKey,
   defaultDayNumberForWeek,
   expandWeekFromMonday,
   getMondayKeyContaining,
-  weekdayShortNb,
+  weekdayShort,
 } from "~/lib/dates"
+import { getDateLocaleTag } from "~/lib/i18n"
 
 import type { CreatePlannedMealBody, PlannedMealDto } from "./types"
 
@@ -34,7 +35,11 @@ export type AddToPlanPanelProps = {
   recipePortions: number
   householdMemberCount: number | null
   mealCategories: RecipeCategoryDto[]
-  createMutation: UseMutationResult<PlannedMealDto, Error, CreatePlannedMealBody>
+  createMutation: UseMutationResult<
+    PlannedMealDto,
+    Error,
+    CreatePlannedMealBody
+  >
   onSaved: () => void
 }
 
@@ -47,17 +52,26 @@ export function AddToPlanPanel({
   createMutation,
   onSaved,
 }: AddToPlanPanelProps) {
+  const { t, i18n } = useTranslation()
+  const dateLoc = getDateLocaleTag(i18n.language)
   const [weekOffset, setWeekOffset] = useState(0)
-  const [day, setDay] = useState(() => defaultDayNumberForWeek(getMondayKeyContaining()))
-  const [mealTypeId, setMealTypeId] = useState(() => pickDefaultMealTypeId(mealCategories))
+  const [day, setDay] = useState(() =>
+    defaultDayNumberForWeek(getMondayKeyContaining())
+  )
+  const [mealTypeId, setMealTypeId] = useState(() =>
+    pickDefaultMealTypeId(mealCategories)
+  )
   const [servings, setServings] = useState(() =>
-    clampServings(householdMemberCount ?? recipePortions ?? 4),
+    clampServings(householdMemberCount ?? recipePortions ?? 4)
   )
   const [servingsTouched, setServingsTouched] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
 
   const sortedCategories = sortPlanningCategories(mealCategories)
-  const selectedMondayKey = addWeeksToMondayKey(getMondayKeyContaining(), weekOffset)
+  const selectedMondayKey = addWeeksToMondayKey(
+    getMondayKeyContaining(),
+    weekOffset
+  )
   const weekDays = expandWeekFromMonday(selectedMondayKey)
 
   useEffect(() => {
@@ -68,7 +82,9 @@ export function AddToPlanPanel({
   useEffect(() => {
     if (sortedCategories.length === 0) return
     setMealTypeId((prev) =>
-      sortedCategories.some((c) => c.id === prev) ? prev : pickDefaultMealTypeId(sortedCategories),
+      sortedCategories.some((c) => c.id === prev)
+        ? prev
+        : pickDefaultMealTypeId(sortedCategories)
     )
   }, [sortedCategories])
 
@@ -89,9 +105,8 @@ export function AddToPlanPanel({
         servings,
       })
       onSaved()
-    } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Kunne ikke lagre."
-      setLocalError(msg)
+    } catch {
+      setLocalError(t("plan.addToPlanSaveFailed"))
     }
   }
 
@@ -101,10 +116,20 @@ export function AddToPlanPanel({
   }
 
   return (
-    <form id={formId} className="space-y-5" onSubmit={(e) => void handleSubmit(e)}>
+    <form
+      id={formId}
+      className="space-y-5"
+      onSubmit={(e) => void handleSubmit(e)}
+    >
       <div>
-        <p className="text-sm font-medium text-foreground">Uke</p>
-        <div className="mt-2 flex gap-2" role="group" aria-label="Velg uke">
+        <p className="text-sm font-medium text-foreground">
+          {t("plan.addToPlanWeekLabel")}
+        </p>
+        <div
+          className="mt-2 flex gap-2"
+          role="group"
+          aria-label={t("plan.addToPlanChooseWeek")}
+        >
           <Button
             type="button"
             size="sm"
@@ -112,7 +137,7 @@ export function AddToPlanPanel({
             aria-pressed={weekOffset === 0}
             onClick={() => setWeekOffset(0)}
           >
-            Denne uken
+            {t("plan.addToPlanThisWeek")}
           </Button>
           <Button
             type="button"
@@ -121,17 +146,17 @@ export function AddToPlanPanel({
             aria-pressed={weekOffset === 1}
             onClick={() => setWeekOffset(1)}
           >
-            Neste uke
+            {t("plan.addToPlanNextWeek")}
           </Button>
         </div>
       </div>
 
       <div>
-        <Label className="text-foreground">Dag</Label>
+        <Label className="text-foreground">{t("plan.addToPlanDayLabel")}</Label>
         <div className="mt-2 grid grid-cols-7 gap-1">
           {weekDays.map((d) => {
             const selected = day === d.dayNumber
-            const short = weekdayShortNb(d.dayNumber)
+            const short = weekdayShort(d.dayNumber, dateLoc)
             const dom = Number(d.dateKey.slice(8, 10))
             return (
               <Button
@@ -153,8 +178,14 @@ export function AddToPlanPanel({
       </div>
 
       <div>
-        <Label className="text-foreground">Måltidstype</Label>
-        <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Velg måltidstype">
+        <Label className="text-foreground">
+          {t("plan.addToPlanMealTypeLabel")}
+        </Label>
+        <div
+          className="mt-2 flex flex-wrap gap-2"
+          role="group"
+          aria-label={t("plan.addToPlanChooseMealType")}
+        >
           {sortedCategories.map((c) => {
             const selected = mealTypeId === c.id
             return (
@@ -174,13 +205,13 @@ export function AddToPlanPanel({
       </div>
 
       <div>
-        <Label htmlFor={`${formId}-servings`}>Porsjoner</Label>
+        <Label htmlFor={`${formId}-servings`}>{t("plan.servingsLabel")}</Label>
         <div className="mt-2 flex items-center gap-3">
           <Button
             type="button"
             size="icon"
             variant="outline"
-            aria-label="Trekk fra én porsjon"
+            aria-label={t("plan.decreaseServing")}
             disabled={servings <= 1 || createMutation.isPending}
             onClick={() => bumpServings(-1)}
           >
@@ -197,7 +228,7 @@ export function AddToPlanPanel({
             type="button"
             size="icon"
             variant="outline"
-            aria-label="Legg til én porsjon"
+            aria-label={t("plan.increaseServing")}
             disabled={servings >= 20 || createMutation.isPending}
             onClick={() => bumpServings(1)}
           >
@@ -213,7 +244,7 @@ export function AddToPlanPanel({
       ) : null}
 
       <button type="submit" className="sr-only" tabIndex={-1}>
-        Lagre i plan
+        {t("common.saveToPlan")}
       </button>
     </form>
   )

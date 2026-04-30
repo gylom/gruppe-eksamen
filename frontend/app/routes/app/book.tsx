@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { DetailSheet } from "~/components/detail-sheet"
+import { RouteErrorRetry } from "~/components/route-error-retry"
 import { cn } from "~/lib/utils"
 import { Button, buttonVariants } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
@@ -22,7 +23,6 @@ import {
 } from "~/features/planning/constants"
 import { useCreatePlannedMeal } from "~/features/planning/use-planned-meals"
 import { useDebouncedValue, useRecipeCategories } from "~/features/recipes/use-recipes"
-import { ApiError } from "~/lib/api-fetch"
 import { getDateLocaleTag } from "~/lib/i18n"
 
 const BOOK_SEARCH_ID = "book-cookbook-search"
@@ -74,8 +74,7 @@ function CookbookRowRating({
                   { recipeId: row.recipeId, stars: step },
                   {
                     onSuccess: () => toast.success(t("book.ratingSaved")),
-                    onError: (err) =>
-                      toast.error(err instanceof ApiError ? err.message : t("book.ratingError")),
+                    onError: () => toast.error(t("book.ratingError")),
                   },
                 )
               }
@@ -123,9 +122,9 @@ export default function BookRoute() {
     if (filtered.length > 0) return filtered
     return PLANNING_MEAL_TYPE_ORDER.map((id) => ({
       id,
-      navn: PLANNING_MEAL_FALLBACK_NAVN[id] ?? `Måltid ${id}`,
+      navn: PLANNING_MEAL_FALLBACK_NAVN[id] ?? t("common.mealFallback", { id }),
     }))
-  }, [categoriesQuery.data])
+  }, [categoriesQuery.data, t])
 
   const hasActiveFilters = trimmed.length > 0 || mealTypeId != null
   const items = cookbookQuery.data?.items ?? null
@@ -205,6 +204,7 @@ export default function BookRoute() {
           ) : null}
           {planningMealCategories.map((c) => {
             const selected = mealTypeId === c.id
+            const chipSuffix = selected ? t("book.filterSelectedSuffix") : ""
             return (
               <Button
                 key={c.id}
@@ -213,7 +213,11 @@ export default function BookRoute() {
                 variant={selected ? "default" : "outline"}
                 className="max-w-[9rem] shrink truncate"
                 aria-pressed={selected}
-                aria-label={`Måltidstype ${c.navn}${selected ? ", valgt" : ""}`}
+                aria-label={t("book.filterChipAria", {
+                  type: t("book.filterChipType"),
+                  name: c.navn,
+                  selectedSuffix: chipSuffix,
+                })}
                 onClick={() => setMealTypeId(selected ? null : c.id)}
               >
                 {c.navn}
@@ -252,20 +256,13 @@ export default function BookRoute() {
 
       <div className="mt-6 space-y-3" aria-live="polite">
         {cookbookQuery.isError ? (
-          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
-            <p className="text-sm font-medium text-foreground">{t("book.loadError")}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {cookbookQuery.error instanceof Error ? cookbookQuery.error.message : t("common.unknownError")}
-            </p>
-            <Button
-              type="button"
-              size="sm"
-              className="mt-3"
-              onClick={() => void cookbookQuery.refetch()}
-            >
-              {t("common.retry")}
-            </Button>
-          </div>
+          <RouteErrorRetry
+            title={t("book.loadError")}
+            hint={t("book.loadErrorHint")}
+            retryLabel={t("common.retry")}
+            busy={cookbookQuery.isFetching}
+            onRetry={() => void cookbookQuery.refetch()}
+          />
         ) : null}
 
         {cookbookQuery.isFetching && items == null ? (
@@ -294,11 +291,20 @@ export default function BookRoute() {
               <Link
                 to="/app/plan"
                 className={cn(
-                  buttonVariants({ variant: "ghost", size: "sm" }),
+                  buttonVariants({ variant: "secondary" }),
                   "mt-2 inline-flex w-full max-w-xs justify-center no-underline",
                 )}
               >
                 {t("shop.emptyGotoPlan")}
+              </Link>
+              <Link
+                to="/app/chef"
+                className={cn(
+                  buttonVariants({ variant: "outline" }),
+                  "mt-2 inline-flex w-full max-w-xs justify-center no-underline",
+                )}
+              >
+                {t("book.emptyChefLink")}
               </Link>
             </div>
           </div>
@@ -380,7 +386,7 @@ export default function BookRoute() {
                 disabled={createPlannedMealMutation.isPending}
                 onClick={() => setSheetOpen(false)}
               >
-                Avbryt
+                {t("common.cancel")}
               </Button>
               <Button
                 type="submit"
@@ -389,7 +395,7 @@ export default function BookRoute() {
                 size="lg"
                 disabled={createPlannedMealMutation.isPending}
               >
-                Lagre i plan
+                {t("common.saveToPlan")}
               </Button>
             </div>
           ) : null

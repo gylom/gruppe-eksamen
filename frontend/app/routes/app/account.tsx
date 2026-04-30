@@ -100,7 +100,14 @@ export default function AccountRoute() {
           <h1 className="text-lg font-semibold">{t("account.loadErrorTitle")}</h1>
           <p className="text-sm text-muted-foreground">{t("onboarding.tryAgainHint")}</p>
         </div>
-        <Button className="w-fit" onClick={() => void household.refetch()}>
+        <Button
+          className="w-fit"
+          disabled={household.isFetching || me.isFetching}
+          onClick={() => {
+            if (household.isError) void household.refetch()
+            if (me.isError) void me.refetch()
+          }}
+        >
           {t("common.retry")}
         </Button>
       </section>

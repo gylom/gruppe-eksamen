@@ -65,7 +65,7 @@ export function LoginForm() {
       navigate("/app")
     } catch (err) {
       if (err instanceof ApiError) {
-        setTopError(err.message)
+        setTopError(t("auth.signInFailed"))
       } else {
         setTopError(t("common.genericError"))
       }

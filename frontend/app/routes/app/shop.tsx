@@ -8,6 +8,7 @@ import { toast } from "sonner"
 
 import { SwipeActionRow } from "~/components/SwipeActionRow"
 import { DetailSheet } from "~/components/detail-sheet"
+import { RouteErrorRetry } from "~/components/route-error-retry"
 import { Button, buttonVariants } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
 import { Label } from "~/components/ui/label"
@@ -32,7 +33,7 @@ const SHOP_COMPLETE_SHEET_TITLE_ID = "shop-complete-sheet-title"
 const selectStyles = cn(
   "h-9 w-full min-w-0 rounded-4xl border border-input bg-input/30 px-3 py-1 text-base transition-colors outline-none",
   "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
-  "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+  "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
 )
 
 function sourceKindLabel(kilde: string, t: TFunction): string {
@@ -60,6 +61,10 @@ function formatPurchasedAt(iso: string | null, localeTag: string): string {
 }
 
 type ShopListView = "active" | "purchased"
+type ShopFormError = {
+  field: "type" | "unit" | "quantity"
+  message: string
+}
 
 export default function ShopRoute() {
   const { t, i18n } = useTranslation()
@@ -87,15 +92,23 @@ export default function ShopRoute() {
   const [varetypeIdStr, setVaretypeIdStr] = useState("")
   const [maaleenhetIdStr, setMaaleenhetIdStr] = useState("")
   const [kvantitetStr, setKvantitetStr] = useState("")
-  const [formError, setFormError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<ShopFormError | null>(null)
   const [editingKilde, setEditingKilde] = useState<string | null>(null)
   const [editingVareId, setEditingVareId] = useState<number | null>(null)
-  const [editingVaretypeId, setEditingVaretypeId] = useState<number | null>(null)
-  const [pendingPurchaseIds, setPendingPurchaseIds] = useState<Set<number>>(() => new Set())
-  const [pendingRestoreIds, setPendingRestoreIds] = useState<Set<number>>(() => new Set())
+  const [editingVaretypeId, setEditingVaretypeId] = useState<number | null>(
+    null
+  )
+  const [pendingPurchaseIds, setPendingPurchaseIds] = useState<Set<number>>(
+    () => new Set()
+  )
+  const [pendingRestoreIds, setPendingRestoreIds] = useState<Set<number>>(
+    () => new Set()
+  )
 
   const lookupsLoading = varetyperQuery.isLoading || maaleenheterQuery.isLoading
   const lookupsError = varetyperQuery.isError || maaleenheterQuery.isError
+  const lookupsRefetching =
+    varetyperQuery.isFetching || maaleenheterQuery.isFetching
 
   function openAdd(trigger?: HTMLButtonElement) {
     if (trigger) returnFocusRef.current = trigger
@@ -131,7 +144,10 @@ export default function ShopRoute() {
     if (!open) setFormError(null)
   }
 
-  function addPendingId(setter: Dispatch<SetStateAction<Set<number>>>, id: number) {
+  function addPendingId(
+    setter: Dispatch<SetStateAction<Set<number>>>,
+    id: number
+  ) {
     setter((current) => {
       const next = new Set(current)
       next.add(id)
@@ -139,7 +155,10 @@ export default function ShopRoute() {
     })
   }
 
-  function removePendingId(setter: Dispatch<SetStateAction<Set<number>>>, id: number) {
+  function removePendingId(
+    setter: Dispatch<SetStateAction<Set<number>>>,
+    id: number
+  ) {
     setter((current) => {
       const next = new Set(current)
       next.delete(id)
@@ -151,10 +170,12 @@ export default function ShopRoute() {
     if (pendingPurchaseIds.has(id)) return
     addPendingId(setPendingPurchaseIds, id)
     purchaseItem.mutate(id, {
-      onSuccess: () => toast.success("Markert som kjøpt"),
+      onSuccess: () => toast.success(t("shop.markedPurchased")),
       onError: (err) =>
         toast.error(
-          err instanceof ApiError ? err.message : "Noe gikk galt. Prøv igjen.",
+          err instanceof ApiError
+            ? t("shop.toastPurchaseError")
+            : t("common.genericError")
         ),
       onSettled: () => removePendingId(setPendingPurchaseIds, id),
     })
@@ -164,22 +185,27 @@ export default function ShopRoute() {
     if (pendingRestoreIds.has(id)) return
     addPendingId(setPendingRestoreIds, id)
     restoreItem.mutate(id, {
-      onSuccess: () => toast.success("Lagt tilbake på listen"),
+      onSuccess: () => toast.success(t("shop.restored")),
       onError: (err) =>
         toast.error(
-          err instanceof ApiError ? err.message : "Noe gikk galt. Prøv igjen.",
+          err instanceof ApiError
+            ? t("shop.toastRestoreError")
+            : t("common.genericError")
         ),
       onSettled: () => removePendingId(setPendingRestoreIds, id),
     })
   }
 
-  function parseQuantity(raw: string): { ok: true; value: number | null } | { ok: false; message: string } {
-    const t = raw.trim()
-    if (t.length === 0) return { ok: true, value: null }
-    const normalized = t.replace(",", ".")
+  function parseQuantity(
+    raw: string
+  ): { ok: true; value: number | null } | { ok: false; message: string } {
+    const s = raw.trim()
+    if (s.length === 0) return { ok: true, value: null }
+    const normalized = s.replace(",", ".")
     const n = Number(normalized)
-    if (!Number.isFinite(n)) return { ok: false, message: "Mengde må være et tall." }
-    if (n < 0) return { ok: false, message: "Mengde kan ikke være negativ." }
+    if (!Number.isFinite(n))
+      return { ok: false, message: t("shop.qtyMustBeNumber") }
+    if (n < 0) return { ok: false, message: t("shop.qtyNonNegative") }
     return { ok: true, value: n }
   }
 
@@ -187,17 +213,17 @@ export default function ShopRoute() {
     setFormError(null)
     const qtyResult = parseQuantity(kvantitetStr)
     if (!qtyResult.ok) {
-      setFormError(qtyResult.message)
+      setFormError({ field: "quantity", message: qtyResult.message })
       return
     }
     const varetypeId = Number(varetypeIdStr)
     if (!varetypeIdStr || Number.isNaN(varetypeId) || varetypeId < 1) {
-      setFormError("Velg varetype.")
+      setFormError({ field: "type", message: t("shop.pickItemType") })
       return
     }
     const maaleenhetId = maaleenhetIdStr === "" ? null : Number(maaleenhetIdStr)
     if (maaleenhetIdStr !== "" && Number.isNaN(maaleenhetId)) {
-      setFormError("Ugyldig måleenhet.")
+      setFormError({ field: "unit", message: t("shop.invalidUnit") })
       return
     }
 
@@ -212,15 +238,17 @@ export default function ShopRoute() {
     }
 
     const onError = (err: unknown) => {
-      const msg =
-        err instanceof ApiError ? err.message : "Noe gikk galt. Prøv igjen."
-      toast.error(msg)
+      toast.error(
+        err instanceof ApiError
+          ? t("shop.toastFormError")
+          : t("common.genericError")
+      )
     }
 
     if (sheetMode === "add") {
       createItem.mutate(body, {
         onSuccess: () => {
-          toast.success("Vare lagt til")
+          toast.success(t("shop.toastItemAdded"))
           setSheetOpen(false)
         },
         onError,
@@ -233,18 +261,19 @@ export default function ShopRoute() {
       { id: editingId, body },
       {
         onSuccess: () => {
-          toast.success("Vare oppdatert")
+          toast.success(t("shop.toastItemUpdated"))
           setSheetOpen(false)
         },
         onError,
-      },
+      }
     )
   }
 
-  const sheetTitle = sheetMode === "add" ? "Legg til vare" : "Rediger vare"
+  const sheetTitle =
+    sheetMode === "add" ? t("shop.addSheetTitle") : t("shop.editSheetTitle")
   const sheetDescription =
     sheetMode === "edit" && editingKilde === "plannedMeal"
-      ? "Rader fra ukesplanen beholder kobling til måltidene når du lagrer."
+      ? t("shop.sheetEditPlanHint")
       : undefined
 
   const list = listQuery.data?.varer ?? []
@@ -263,9 +292,13 @@ export default function ShopRoute() {
       <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight">{t("shop.title")}</h1>
+            <h1 className="text-xl font-semibold tracking-tight">
+              {t("shop.title")}
+            </h1>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {listView === "active" ? t("shop.subtitleActive") : t("shop.subtitlePurchased")}
+              {listView === "active"
+                ? t("shop.subtitleActive")
+                : t("shop.subtitlePurchased")}
             </p>
           </div>
           {listView === "active" ? (
@@ -294,9 +327,10 @@ export default function ShopRoute() {
             aria-selected={listView === "active"}
             className={cn(
               "min-h-9 min-w-0 flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+              "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
               listView === "active"
                 ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
+                : "text-muted-foreground hover:text-foreground"
             )}
             onClick={() => setListView("active")}
           >
@@ -308,9 +342,10 @@ export default function ShopRoute() {
             aria-selected={listView === "purchased"}
             className={cn(
               "min-h-9 min-w-0 flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+              "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
               listView === "purchased"
                 ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
+                : "text-muted-foreground hover:text-foreground"
             )}
             onClick={() => setListView("purchased")}
           >
@@ -324,7 +359,7 @@ export default function ShopRoute() {
               type="button"
               variant="secondary"
               size="sm"
-              className="w-full min-h-10 rounded-2xl font-medium"
+              className="min-h-10 w-full rounded-2xl font-medium"
               disabled={purchasedCount === 0}
               onClick={() => setCompleteSheetOpen(true)}
             >
@@ -334,30 +369,23 @@ export default function ShopRoute() {
         ) : null}
       </header>
 
-      <div className="flex-1 px-4 pb-6 pt-4">
+      <div className="flex-1 px-4 pt-4 pb-6">
         {listView === "active" && listQuery.isError ? (
-          <section
-            className="flex min-h-[220px] flex-col justify-center gap-4 rounded-xl border border-border bg-card/40 p-4"
-            aria-live="polite"
-          >
-            <div>
-              <h2 className="text-base font-medium">{t("shop.loadError")}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{t("shop.loadErrorHint")}</p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-fit"
-              disabled={listQuery.isFetching}
-              onClick={() => void listQuery.refetch()}
-            >
-              {t("common.retry")}
-            </Button>
-          </section>
+          <RouteErrorRetry
+            title={t("shop.loadError")}
+            hint={t("shop.loadErrorHint")}
+            retryLabel={t("common.retry")}
+            busy={listQuery.isFetching}
+            onRetry={() => void listQuery.refetch()}
+          />
         ) : null}
 
         {listView === "active" && listLoading && !listQuery.isError ? (
-          <ul className="space-y-2" aria-hidden>
+          <ul
+            className="space-y-2"
+            aria-busy="true"
+            aria-label={t("common.loading")}
+          >
             {Array.from({ length: 5 }).map((_, i) => (
               <li
                 key={i}
@@ -370,26 +398,33 @@ export default function ShopRoute() {
         {listView === "active" && listQuery.isSuccess && listEmpty ? (
           <section
             className="flex min-h-[280px] flex-col items-center justify-center gap-5 rounded-2xl border border-dashed border-border/80 bg-muted/20 px-4 py-10 text-center"
-            aria-label="Tom handleliste"
+            aria-label={t("shop.emptyAria")}
           >
             <div className="max-w-xs space-y-2">
-              <p className="text-base font-medium text-foreground">Ingenting her ennå</p>
+              <p className="text-base font-medium text-foreground">
+                {t("shop.emptyTitle")}
+              </p>
               <p className="text-sm leading-relaxed text-muted-foreground">
-                Legg til det du trenger, eller hent forslag fra ukens plan under Plan.
+                {t("shop.emptyActiveHint")}
               </p>
             </div>
             <div className="flex w-full max-w-sm flex-col gap-2 sm:flex-row sm:justify-center">
-              <Button type="button" className="w-full sm:w-auto" onClick={() => openAdd()}>
-                Legg til vare
+              <Button
+                type="button"
+                className="w-full sm:w-auto"
+                onClick={() => openAdd()}
+              >
+                {t("shop.addItem")}
               </Button>
               <Link
                 to="/app/plan"
                 className={buttonVariants({
                   variant: "outline",
-                  className: "inline-flex w-full min-h-11 justify-center rounded-2xl sm:w-auto",
+                  className:
+                    "inline-flex min-h-11 w-full justify-center rounded-2xl sm:w-auto",
                 })}
               >
-                Gå til plan
+                {t("shop.emptyGotoPlan")}
               </Link>
             </div>
           </section>
@@ -406,8 +441,8 @@ export default function ShopRoute() {
                   className="overflow-hidden rounded-xl border border-border/80 bg-card/50 shadow-sm"
                 >
                   <SwipeActionRow
-                    actionLabel="Kjøpt"
-                    fallbackAriaLabel={`Marker ${name} som kjøpt`}
+                    actionLabel={t("shop.markPurchased")}
+                    fallbackAriaLabel={t("shop.purchaseAria", { name })}
                     loading={rowPurchasePending}
                     disabled={rowPurchasePending}
                     onAction={() => purchaseRow(row.id)}
@@ -415,15 +450,17 @@ export default function ShopRoute() {
                     <div className="flex min-w-0 gap-2 pr-1">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                          <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+                          <span className="shrink-0 text-sm font-semibold text-foreground tabular-nums">
                             {formatQuantityLine(row, t)}
                           </span>
-                          <span className="min-w-0 break-words text-sm font-medium leading-snug">
+                          <span className="min-w-0 text-sm leading-snug font-medium break-words">
                             {name}
                           </span>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          <span className="font-medium text-foreground/80">{sourceKindLabel(row.kilde, t)}</span>
+                          <span className="font-medium text-foreground/80">
+                            {sourceKindLabel(row.kilde, t)}
+                          </span>
                           <span aria-hidden> · </span>
                           <span>{row.brukernavn}</span>
                         </p>
@@ -433,7 +470,7 @@ export default function ShopRoute() {
                         variant="ghost"
                         size="icon-sm"
                         className="shrink-0 text-muted-foreground hover:text-foreground"
-                        aria-label={`Rediger ${name}`}
+                        aria-label={t("shop.editRow", { name })}
                         disabled={rowPurchasePending}
                         onClick={(e) => openEdit(row, e.currentTarget)}
                       >
@@ -448,49 +485,48 @@ export default function ShopRoute() {
         ) : null}
 
         {listView === "purchased" && purchasedQuery.isError ? (
-          <section
-            className="flex min-h-[220px] flex-col justify-center gap-4 rounded-xl border border-border bg-card/40 p-4"
-            aria-live="polite"
-          >
-            <div>
-              <h2 className="text-base font-medium">Kunne ikke laste kjøpte varer</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Sjekk nettverket og prøv på nytt.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-fit"
-              disabled={purchasedQuery.isFetching}
-              onClick={() => void purchasedQuery.refetch()}
-            >
-              Prøv igjen
-            </Button>
-          </section>
+          <RouteErrorRetry
+            title={t("shop.purchasedLoadError")}
+            hint={t("shop.loadErrorHint")}
+            retryLabel={t("common.retry")}
+            busy={purchasedQuery.isFetching}
+            onRetry={() => void purchasedQuery.refetch()}
+          />
         ) : null}
 
-        {listView === "purchased" && purchasedLoading && !purchasedQuery.isError ? (
-          <ul className="space-y-2" aria-hidden>
+        {listView === "purchased" &&
+        purchasedLoading &&
+        !purchasedQuery.isError ? (
+          <ul
+            className="space-y-2"
+            aria-busy="true"
+            aria-label={t("shop.loadingPurchased")}
+          >
             {Array.from({ length: 5 }).map((_, i) => (
-              <li key={i} className="h-[4.25rem] animate-pulse rounded-xl bg-muted/60" />
+              <li
+                key={i}
+                className="h-[4.25rem] animate-pulse rounded-xl bg-muted/60"
+              />
             ))}
           </ul>
         ) : null}
 
-        {listView === "purchased" && purchasedQuery.isSuccess && purchasedEmpty ? (
+        {listView === "purchased" &&
+        purchasedQuery.isSuccess &&
+        purchasedEmpty ? (
           <section
             className="flex min-h-[280px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/80 bg-muted/20 px-4 py-10 text-center"
-            aria-label="Ingen kjøpte varer"
+            aria-label={t("shop.purchasedEmptyAria")}
           >
             <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
-              Her vises varer du krysser av mens du handler. Du kan gjenopprette til den aktive listen, eller fullføre
-              handleturen når du er ferdig.
+              {t("shop.purchasedExplainer")}
             </p>
           </section>
         ) : null}
 
-        {listView === "purchased" && purchasedQuery.isSuccess && !purchasedEmpty ? (
+        {listView === "purchased" &&
+        purchasedQuery.isSuccess &&
+        !purchasedEmpty ? (
           <ul className="space-y-2">
             {purchasedList.map((row) => {
               const name = itemDisplayName(row)
@@ -502,27 +538,32 @@ export default function ShopRoute() {
                   className="overflow-hidden rounded-xl border border-border/80 bg-card/50 shadow-sm"
                 >
                   <SwipeActionRow
-                    actionLabel="Gjenopprett"
-                    fallbackAriaLabel={`Gjenopprett ${name} til aktiv liste`}
+                    actionLabel={t("shop.restore")}
+                    fallbackAriaLabel={t("shop.restoreAria", { name })}
                     loading={rowRestorePending}
                     disabled={rowRestorePending}
                     onAction={() => restoreRow(row.id)}
                   >
                     <div className="min-w-0 pr-1">
                       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                        <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+                        <span className="shrink-0 text-sm font-semibold text-foreground tabular-nums">
                           {formatQuantityLine(row, t)}
                         </span>
-                        <span className="min-w-0 break-words text-sm font-medium leading-snug">{name}</span>
+                        <span className="min-w-0 text-sm leading-snug font-medium break-words">
+                          {name}
+                        </span>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground/80">{sourceKindLabel(row.kilde, t)}</span>
+                        <span className="font-medium text-foreground/80">
+                          {sourceKindLabel(row.kilde, t)}
+                        </span>
                         <span aria-hidden> · </span>
                         <span>{row.brukernavn}</span>
                       </p>
                       <p className="mt-1 text-xs font-medium text-foreground">
                         <span className="rounded-md border border-border bg-muted/50 px-1.5 py-0.5">
-                          Kjøpt{boughtLine ? ` · ${boughtLine}` : ""}
+                          {t("shop.purchasedBadge")}
+                          {boughtLine ? ` · ${boughtLine}` : ""}
                         </span>
                       </p>
                     </div>
@@ -550,7 +591,7 @@ export default function ShopRoute() {
               disabled={createItem.isPending || updateItem.isPending}
               onClick={() => closeSheet(false)}
             >
-              Avbryt
+              {t("common.cancel")}
             </Button>
             <Button
               type="button"
@@ -563,13 +604,33 @@ export default function ShopRoute() {
               }
               onClick={() => saveItem()}
             >
-              {createItem.isPending || updateItem.isPending ? "Lagrer…" : "Lagre"}
+              {createItem.isPending || updateItem.isPending
+                ? t("shop.sheetSaving")
+                : t("common.save")}
             </Button>
           </div>
         }
       >
         {lookupsError ? (
-          <p className="text-sm text-destructive">Kunne ikke laste varetyper eller måleenheter.</p>
+          <div className="space-y-3" role="alert">
+            <p className="text-sm text-destructive">
+              {t("shop.lookupsFailed")}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-2xl"
+              disabled={lookupsRefetching}
+              aria-busy={lookupsRefetching}
+              onClick={() => {
+                if (varetyperQuery.isError) void varetyperQuery.refetch()
+                if (maaleenheterQuery.isError) void maaleenheterQuery.refetch()
+              }}
+            >
+              {t("shop.retryLookups")}
+            </Button>
+          </div>
         ) : lookupsLoading ? (
           <div className="space-y-3" aria-busy="true">
             <div className="h-9 animate-pulse rounded-4xl bg-muted" />
@@ -580,18 +641,19 @@ export default function ShopRoute() {
           <div className="space-y-4">
             {formError ? (
               <p className="text-sm text-destructive" role="alert">
-                {formError}
+                {formError.message}
               </p>
             ) : null}
             <div className="space-y-2">
-              <Label htmlFor="shop-varetype">Varetype</Label>
+              <Label htmlFor="shop-varetype">{t("shop.typeLabel")}</Label>
               <select
                 id="shop-varetype"
                 className={selectStyles}
                 value={varetypeIdStr}
+                aria-invalid={formError?.field === "type" ? true : undefined}
                 onChange={(e) => setVaretypeIdStr(e.target.value)}
               >
-                <option value="">Velg …</option>
+                <option value="">{t("shop.selectTypePlaceholder")}</option>
                 {(varetyperQuery.data ?? []).map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.varetype}
@@ -600,14 +662,15 @@ export default function ShopRoute() {
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="shop-maaleenhet">Måleenhet</Label>
+              <Label htmlFor="shop-maaleenhet">{t("shop.unitLabel")}</Label>
               <select
                 id="shop-maaleenhet"
                 className={selectStyles}
                 value={maaleenhetIdStr}
+                aria-invalid={formError?.field === "unit" ? true : undefined}
                 onChange={(e) => setMaaleenhetIdStr(e.target.value)}
               >
-                <option value="">Ingen</option>
+                <option value="">{t("shop.unitNone")}</option>
                 {(maaleenheterQuery.data ?? []).map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.enhet}
@@ -617,15 +680,17 @@ export default function ShopRoute() {
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="shop-kvantitet">Mengde (valgfritt)</Label>
+              <Label htmlFor="shop-kvantitet">{t("shop.qtyLabel")}</Label>
               <Input
                 id="shop-kvantitet"
                 inputMode="decimal"
                 autoComplete="off"
-                placeholder="La stå tom for påminnelse"
+                placeholder={t("shop.qtyPlaceholder")}
                 value={kvantitetStr}
                 onChange={(e) => setKvantitetStr(e.target.value)}
-                aria-invalid={formError?.includes("Mengde") ? true : undefined}
+                aria-invalid={
+                  formError?.field === "quantity" ? true : undefined
+                }
               />
             </div>
           </div>
@@ -636,8 +701,8 @@ export default function ShopRoute() {
         open={completeSheetOpen}
         onOpenChange={setCompleteSheetOpen}
         labelledById={SHOP_COMPLETE_SHEET_TITLE_ID}
-        title="Fullfør handletur?"
-        description="Bekreft når du er ferdig i butikken. Kjøpte rader arkiveres for kokebok senere; aktive rader blir stående."
+        title={t("shop.completeTitle")}
+        description={t("shop.completeDescription")}
         returnFocusRef={completeTripReturnFocusRef}
         footer={
           <div className="flex w-full gap-2 px-1">
@@ -648,7 +713,7 @@ export default function ShopRoute() {
               disabled={completeTrip.isPending}
               onClick={() => setCompleteSheetOpen(false)}
             >
-              Avbryt
+              {t("common.cancel")}
             </Button>
             <Button
               type="button"
@@ -666,19 +731,23 @@ export default function ShopRoute() {
                   onSuccess: (data) => {
                     setCompleteSheetOpen(false)
                     if (data.archiveRowCount > 0) {
-                      toast.success("Handletur fullført")
+                      toast.success(t("shop.tripCompleted"))
                     } else {
-                      toast.info("Ingenting nytt å arkivere")
+                      toast.info(t("shop.nothingToArchive"))
                     }
                   },
                   onError: (err) =>
                     toast.error(
-                      err instanceof ApiError ? err.message : "Noe gikk galt. Prøv igjen.",
+                      err instanceof ApiError
+                        ? t("shop.toastCompleteError")
+                        : t("common.genericError")
                     ),
                 })
               }
             >
-              {completeTrip.isPending ? "Fullfører…" : "Bekreft"}
+              {completeTrip.isPending
+                ? t("shop.completing")
+                : t("shop.confirm")}
             </Button>
           </div>
         }
@@ -690,8 +759,10 @@ export default function ShopRoute() {
             <div className="h-10 animate-pulse rounded-xl bg-muted/80" />
           </div>
         ) : previewQuery.isError ? (
-          <div className="space-y-3">
-            <p className="text-sm text-destructive">Kunne ikke hente oppsummering.</p>
+          <div className="space-y-3" role="alert">
+            <p className="text-sm text-destructive">
+              {t("shop.previewFailed")}
+            </p>
             <Button
               type="button"
               variant="outline"
@@ -699,30 +770,42 @@ export default function ShopRoute() {
               className="rounded-2xl"
               onClick={() => void previewQuery.refetch()}
             >
-              Prøv igjen
+              {t("common.retry")}
             </Button>
           </div>
         ) : previewQuery.data ? (
           <ul className="list-none space-y-3 text-sm leading-snug text-foreground">
             <li className="rounded-xl border border-border/80 bg-muted/20 px-3 py-2.5">
-              <span className="font-medium text-foreground">Arkiveres</span>
-              <span className="mt-0.5 block tabular-nums text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {t("shop.previewArchiveLabel")}
+              </span>
+              <span className="mt-0.5 block text-muted-foreground tabular-nums">
                 {previewQuery.data.archiveRowCount}{" "}
-                {previewQuery.data.archiveRowCount === 1 ? "rad" : "rader"}
+                {previewQuery.data.archiveRowCount === 1
+                  ? t("shop.rowSingular")
+                  : t("shop.rowPlural")}
               </span>
             </li>
             <li className="rounded-xl border border-border/80 bg-muted/20 px-3 py-2.5">
-              <span className="font-medium text-foreground">Kokebok (senere)</span>
-              <span className="mt-0.5 block tabular-nums text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {t("shop.previewCookbookLabel")}
+              </span>
+              <span className="mt-0.5 block text-muted-foreground tabular-nums">
                 {previewQuery.data.cookbookMealCount}{" "}
-                {previewQuery.data.cookbookMealCount === 1 ? "måltid" : "måltider"}
+                {previewQuery.data.cookbookMealCount === 1
+                  ? t("shop.mealSingular")
+                  : t("shop.mealPlural")}
               </span>
             </li>
             <li className="rounded-xl border border-border/80 bg-muted/20 px-3 py-2.5">
-              <span className="font-medium text-foreground">Forblir på aktiv liste</span>
-              <span className="mt-0.5 block tabular-nums text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {t("shop.previewActiveLabel")}
+              </span>
+              <span className="mt-0.5 block text-muted-foreground tabular-nums">
                 {previewQuery.data.remainingActiveRowCount}{" "}
-                {previewQuery.data.remainingActiveRowCount === 1 ? "rad" : "rader"}
+                {previewQuery.data.remainingActiveRowCount === 1
+                  ? t("shop.rowSingular")
+                  : t("shop.rowPlural")}
               </span>
             </li>
           </ul>

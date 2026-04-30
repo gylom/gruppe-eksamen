@@ -1,6 +1,6 @@
 # Story 6.2: Core Empty, Error, Loading, Responsive, and Accessibility Polish
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -117,6 +117,15 @@ so that the household workflow works beyond the happy-path demo device.
   - [ ] Manual reduced-motion smoke: enable reduced motion in the browser/OS and confirm animations are subdued while state changes remain understandable.
   - [ ] Manual language smoke: switch Norwegian/English and confirm newly polished states use translations and still fit.
   - [ ] Manual theme smoke: light/dark/system preserve readable contrast for empty/error/loading/status states.
+
+### Review Findings
+
+- [x] [Review][Patch] Stored language preference applies too late and root errors can render in the wrong language [frontend/app/lib/i18n.ts:769]
+- [x] [Review][Patch] Add-to-plan sheets still contain hard-coded Norwegian and raw save errors [frontend/app/features/planning/add-to-plan-panel.tsx:93]
+- [x] [Review][Patch] Root ErrorBoundary can expose production `statusText` instead of friendly localized copy [frontend/app/root.tsx:65]
+- [x] [Review][Patch] Protected meal removal displays raw API message inline [frontend/app/routes/app/plan.tsx:263]
+- [x] [Review][Patch] Shopping add/edit lookup failure disables saving without a retry path [frontend/app/routes/app/shop.tsx:525]
+- [x] [Review][Patch] Shopping form marks quantity invalid for unrelated type/unit errors [frontend/app/routes/app/shop.tsx:597]
 
 ## Dev Notes
 

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { DetailSheet } from "~/components/detail-sheet"
+import { RouteErrorRetry } from "~/components/route-error-retry"
 import { Button } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
 import { Label } from "~/components/ui/label"
@@ -72,9 +73,9 @@ export default function ChefRoute() {
     if (filtered.length > 0) return filtered
     return PLANNING_MEAL_TYPE_ORDER.map((id) => ({
       id,
-      navn: PLANNING_MEAL_FALLBACK_NAVN[id] ?? `Måltid ${id}`,
+      navn: PLANNING_MEAL_FALLBACK_NAVN[id] ?? t("common.mealFallback", { id }),
     }))
-  }, [categoriesQuery.data])
+  }, [categoriesQuery.data, t])
 
   const hasActiveFilters = trimmed.length > 0 || kategoriId != null
   const listEmpty =
@@ -152,6 +153,7 @@ export default function ChefRoute() {
           ) : null}
           {filterCategories.map((c) => {
             const selected = kategoriId === c.id
+            const chipSuffix = selected ? t("chef.filterSelectedSuffix") : ""
             return (
               <Button
                 key={c.id}
@@ -159,7 +161,11 @@ export default function ChefRoute() {
                 size="sm"
                 variant={selected ? "default" : "outline"}
                 aria-pressed={selected}
-                aria-label={`Måltidstype ${c.navn}${selected ? ", valgt" : ""}`}
+                aria-label={t("chef.filterChipAria", {
+                  type: t("chef.filterChipType"),
+                  name: c.navn,
+                  selectedSuffix: chipSuffix,
+                })}
                 onClick={() => setKategoriId(selected ? null : c.id)}
               >
                 {c.navn}
@@ -171,24 +177,17 @@ export default function ChefRoute() {
 
       <div className="mt-6 space-y-3" aria-live="polite">
         {recipesQuery.isError ? (
-          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
-            <p className="text-sm font-medium text-foreground">Kunne ikke laste oppskrifter.</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {recipesQuery.error instanceof Error ? recipesQuery.error.message : "Ukjent feil"}
-            </p>
-            <Button
-              type="button"
-              size="sm"
-              className="mt-3"
-              onClick={() => void recipesQuery.refetch()}
-            >
-              Prøv igjen
-            </Button>
-          </div>
+          <RouteErrorRetry
+            title={t("chef.loadError")}
+            hint={t("common.networkHint")}
+            retryLabel={t("common.retry")}
+            busy={recipesQuery.isFetching}
+            onRetry={() => void recipesQuery.refetch()}
+          />
         ) : null}
 
         {recipesQuery.isFetching && recipesQuery.data == null ? (
-          <ul className="space-y-3" aria-label="Laster oppskriftsliste">
+          <ul className="space-y-3" aria-label={t("chef.loadingListLabel")}>
             {[0, 1, 2].map((i) => (
               <li
                 key={i}
@@ -200,15 +199,13 @@ export default function ChefRoute() {
 
         {listEmpty ? (
           <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center">
-            <p className="text-sm font-medium text-foreground">Ingen treff</p>
+            <p className="text-sm font-medium text-foreground">{t("chef.noHits")}</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              {hasActiveFilters
-                ? "Prøv å fjerne søk eller måltidsfilter, eller søk på noe annet."
-                : "Det finnes ingen oppskrifter å vise ennå."}
+              {hasActiveFilters ? t("chef.noHitsFiltered") : t("chef.noRecipesYet")}
             </p>
             {hasActiveFilters ? (
               <Button type="button" className="mt-4" variant="secondary" onClick={clearFilters}>
-                Nullstill søk og filter
+                {t("chef.clearFilters")}
               </Button>
             ) : null}
           </div>
@@ -252,7 +249,7 @@ export default function ChefRoute() {
                 disabled={createPlannedMealMutation.isPending}
                 onClick={() => setShowPlanForm(false)}
               >
-                Tilbake
+                {t("common.back")}
               </Button>
               <Button
                 type="submit"
@@ -261,7 +258,7 @@ export default function ChefRoute() {
                 size="lg"
                 disabled={createPlannedMealMutation.isPending}
               >
-                Lagre i plan
+                {t("common.saveToPlan")}
               </Button>
             </div>
           ) : (
@@ -272,13 +269,13 @@ export default function ChefRoute() {
               disabled={detailQuery.data == null}
               onClick={() => setShowPlanForm(true)}
             >
-              Legg i plan
+              {t("book.addToPlan")}
             </Button>
           )
         }
       >
         {detailQuery.isLoading ? (
-          <div className="space-y-4 py-2" aria-busy aria-label="Laster oppskriftsdetaljer">
+          <div className="space-y-4 py-2" aria-busy="true" aria-label={t("chef.loadingDetailLabel")}>
             <div className="h-40 animate-pulse rounded-2xl bg-muted" />
             <div className="h-4 w-3/5 animate-pulse rounded bg-muted" />
             <div className="h-4 w-full animate-pulse rounded bg-muted" />
@@ -286,10 +283,10 @@ export default function ChefRoute() {
           </div>
         ) : null}
         {detailQuery.isError ? (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
-            <p className="text-sm font-medium">Kunne ikke hente detaljer.</p>
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4" role="alert">
+            <p className="text-sm font-medium text-foreground">{t("chef.detailLoadError")}</p>
             <Button type="button" size="sm" className="mt-3" onClick={() => void detailQuery.refetch()}>
-              Prøv igjen
+              {t("common.retry")}
             </Button>
           </div>
         ) : null}
@@ -303,7 +300,7 @@ export default function ChefRoute() {
             mealCategories={planningCategoriesForChef}
             createMutation={createPlannedMealMutation}
             onSaved={() => {
-              toast.success("Lagret i ukeplan.")
+              toast.success(t("book.planSavedToast"))
               setSheetOpen(false)
               setShowPlanForm(false)
               setSelectedId(null)

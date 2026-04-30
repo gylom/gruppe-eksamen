@@ -42,7 +42,14 @@ export function BottomNav() {
                   )}
                 />
                 <Icon className="size-6" strokeWidth={isActive ? 2.5 : 2} aria-hidden="true" />
-                <span className="leading-tight text-center">{t(`nav.${key}`)}</span>
+                <span
+                  className={cn(
+                    "max-w-[4.5rem] break-words text-center leading-tight sm:max-w-[5.5rem]",
+                    isActive && "underline decoration-2 underline-offset-2",
+                  )}
+                >
+                  {t(`nav.${key}`)}
+                </span>
               </>
             )}
           </NavLink>

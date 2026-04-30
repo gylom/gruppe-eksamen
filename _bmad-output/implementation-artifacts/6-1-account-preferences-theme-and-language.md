@@ -90,12 +90,12 @@ so that the app reflects my household and display preferences.
 
 ### Review Findings
 
-- [ ] [Review][Patch] Tracked npm lockfile is not updated for the new i18n dependencies, and the root build currently fails [frontend/package.json:27]
-- [ ] [Review][Patch] Persisted English language can diverge from the hard-coded `html lang="nb"` first document render [frontend/app/root.tsx:22]
-- [ ] [Review][Patch] Core demo-path copy remains hard-coded Norwegian after adding the language preference [frontend/app/routes/app/chef.tsx:175]
-- [ ] [Review][Patch] Account retry handles household failures but not `me` query failures [frontend/app/routes/app/account.tsx:96]
-- [ ] [Review][Patch] `ModeToggle` still lacks visible current theme text and theme-change toast behavior [frontend/app/components/mode-toggle.tsx:14]
-- [ ] [Review][Patch] Language preference toast reports success before `changeLanguage` completes [frontend/app/features/settings/language-preference-control.tsx:14]
+- [x] [Review][Patch] Tracked npm lockfile is not updated for the new i18n dependencies, and the root build currently fails [frontend/package.json:27]
+- [x] [Review][Patch] Persisted English language can diverge from the hard-coded `html lang="nb"` first document render [frontend/app/root.tsx:22]
+- [x] [Review][Patch] Core demo-path copy remains hard-coded Norwegian after adding the language preference [frontend/app/routes/app/chef.tsx:175]
+- [x] [Review][Patch] Account retry handles household failures but not `me` query failures [frontend/app/routes/app/account.tsx:96]
+- [x] [Review][Patch] `ModeToggle` still lacks visible current theme text and theme-change toast behavior [frontend/app/components/mode-toggle.tsx:14]
+- [x] [Review][Patch] Language preference toast reports success before `changeLanguage` completes [frontend/app/features/settings/language-preference-control.tsx:14]
 
 ## Dev Notes
 

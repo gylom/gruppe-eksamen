@@ -76,7 +76,7 @@ export function RegisterForm() {
         } else if (msg.includes("Email") || msg.includes("E-post") || msg.includes("E-mail")) {
           setError("email", { message: msg })
         } else {
-          setTopError(msg)
+          setTopError(t("auth.signUpFailed"))
         }
       } else {
         setTopError(t("common.genericError"))

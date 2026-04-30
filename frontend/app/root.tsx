@@ -1,4 +1,3 @@
-import i18n from "~/lib/i18n"
 import { QueryClientProvider } from "@tanstack/react-query"
 import {
   Links,
@@ -11,6 +10,7 @@ import {
 
 import { ThemeProvider, themeInitScript } from "~/components/theme-provider"
 import { Toaster } from "~/components/ui/sonner"
+import i18n from "~/lib/i18n"
 import { queryClient } from "~/lib/query-client"
 
 import type { Route } from "./+types/root"
@@ -53,11 +53,16 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   let stack: string | undefined
 
   if (isRouteErrorResponse(error)) {
-    message = error.status === 404 ? i18n.t("errors.notFoundTitle") : i18n.t("errors.errorTitle")
+    message =
+      error.status === 404
+        ? i18n.t("errors.notFoundTitle")
+        : i18n.t("errors.errorTitle")
     details =
       error.status === 404
         ? i18n.t("errors.notFound")
-        : error.statusText || details
+        : import.meta.env.DEV && error.statusText
+          ? error.statusText
+          : details
   } else if (import.meta.env.DEV && error && error instanceof Error) {
     details = error.message
     stack = error.stack
