@@ -28,6 +28,7 @@ public class AppDbContext : DbContext
     public DbSet<Oppskriftskategori> Oppskriftskategorier => Set<Oppskriftskategori>();
     public DbSet<Ingrediens> Ingredienser => Set<Ingrediens>();
     public DbSet<Skjuloppskrift> Skjuloppskrifter => Set<Skjuloppskrift>();
+    public DbSet<PlanlagtMaaltid> PlanlagteMaaltider => Set<PlanlagtMaaltid>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -259,5 +260,26 @@ public class AppDbContext : DbContext
             .HasOne(x => x.Bruker)
             .WithMany()
             .HasForeignKey(x => x.UserId);
+
+        modelBuilder.Entity<PlanlagtMaaltid>().ToTable("PlanlagteMaaltider");
+
+        modelBuilder.Entity<PlanlagtMaaltid>()
+            .HasOne(x => x.Husholdning)
+            .WithMany()
+            .HasForeignKey(x => x.HusholdningId);
+
+        modelBuilder.Entity<PlanlagtMaaltid>()
+            .HasOne(x => x.Oppskrift)
+            .WithMany()
+            .HasForeignKey(x => x.OppskriftId);
+
+        modelBuilder.Entity<PlanlagtMaaltid>()
+            .HasOne(x => x.Maaltidstype)
+            .WithMany()
+            .HasForeignKey(x => x.MaaltidstypeId);
+
+        modelBuilder.Entity<PlanlagtMaaltid>()
+            .HasIndex(x => new { x.HusholdningId, x.UkeStartDato, x.Dag, x.MaaltidstypeId })
+            .IsUnique();
     }
 }

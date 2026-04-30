@@ -1,0 +1,55 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+
+import { apiFetch } from "~/lib/api-fetch"
+import { isMondayKey } from "~/lib/dates"
+
+import type { CreatePlannedMealBody, PlannedMealDto } from "./types"
+
+export function usePlannedMeals(weekStartDate: string | null) {
+  return useQuery({
+    queryKey: ["planned-meals", weekStartDate] as const,
+    queryFn: () =>
+      apiFetch<PlannedMealDto[]>(
+        `/api/planlagte-maaltider?weekStartDate=${encodeURIComponent(weekStartDate!)}`,
+      ),
+    enabled: weekStartDate != null && isMondayKey(weekStartDate),
+  })
+}
+
+export function useCreatePlannedMeal() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (body: CreatePlannedMealBody) =>
+      apiFetch<PlannedMealDto>("/api/planlagte-maaltider", {
+        method: "POST",
+        body,
+      }),
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: ["planned-meals", variables.weekStartDate],
+      })
+    },
+  })
+}
+
+export type UpdatePlannedMealServingsVars = {
+  id: number
+  servings: number
+  weekStartDate: string
+}
+
+export function useUpdatePlannedMealServings() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, servings }: UpdatePlannedMealServingsVars) =>
+      apiFetch<PlannedMealDto>(`/api/planlagte-maaltider/${id}/servings`, {
+        method: "PUT",
+        body: { servings },
+      }),
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: ["planned-meals", variables.weekStartDate],
+      })
+    },
+  })
+}

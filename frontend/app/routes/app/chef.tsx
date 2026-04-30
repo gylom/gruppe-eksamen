@@ -6,6 +6,15 @@ import { DetailSheet } from "~/components/detail-sheet"
 import { Button } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
 import { Label } from "~/components/ui/label"
+import { useHousehold } from "~/features/household/use-household"
+import { AddToPlanPanel } from "~/features/planning/add-to-plan-panel"
+import {
+  PLANNING_MEAL_FALLBACK_NAVN,
+  PLANNING_MEAL_TYPE_IDS,
+  PLANNING_MEAL_TYPE_ORDER,
+  sortPlanningCategories,
+} from "~/features/planning/constants"
+import { useCreatePlannedMeal } from "~/features/planning/use-planned-meals"
 import { RecipeCard } from "~/features/recipes/recipe-card"
 import { RecipeDetailPanel } from "~/features/recipes/recipe-detail-panel"
 import type { RecipeListFilters } from "~/features/recipes/use-recipes"
@@ -18,6 +27,8 @@ import {
 
 const EXCLUDED_FILTER_CATEGORY_IDS = new Set([4, 5, 6])
 
+const CHEF_PLAN_FORM_ID = "chef-add-plan-form"
+
 export default function ChefRoute() {
   const searchInputId = "chef-recipe-search"
   const detailTitleId = "chef-recipe-detail-title"
@@ -29,6 +40,10 @@ export default function ChefRoute() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [sheetTitle, setSheetTitle] = useState("")
+  const [showPlanForm, setShowPlanForm] = useState(false)
+
+  const householdQuery = useHousehold()
+  const createPlannedMealMutation = useCreatePlannedMeal()
 
   const filters: RecipeListFilters = useMemo(
     () => ({
@@ -47,6 +62,16 @@ export default function ChefRoute() {
   const filterCategories = useMemo(() => {
     if (!categoriesQuery.data) return []
     return categoriesQuery.data.filter((c) => !EXCLUDED_FILTER_CATEGORY_IDS.has(c.id))
+  }, [categoriesQuery.data])
+
+  const planningCategoriesForChef = useMemo(() => {
+    const raw = categoriesQuery.data ?? []
+    const filtered = sortPlanningCategories(raw.filter((c) => PLANNING_MEAL_TYPE_IDS.has(c.id)))
+    if (filtered.length > 0) return filtered
+    return PLANNING_MEAL_TYPE_ORDER.map((id) => ({
+      id,
+      navn: PLANNING_MEAL_FALLBACK_NAVN[id] ?? `Måltid ${id}`,
+    }))
   }, [categoriesQuery.data])
 
   const hasActiveFilters = trimmed.length > 0 || kategoriId != null
@@ -73,9 +98,7 @@ export default function ChefRoute() {
     setKategoriId(null)
   }
 
-  function addToPlanHint() {
-    toast.info("Ukeplanlegging kommer i neste leveranse (Story 2.2).")
-  }
+  const householdMemberCount = householdQuery.data?.medlemmer.length ?? null
 
   return (
     <section className="p-4" aria-labelledby="chef-heading">
@@ -208,16 +231,49 @@ export default function ChefRoute() {
         open={sheetOpen}
         onOpenChange={(open) => {
           setSheetOpen(open)
-          if (!open) setSelectedId(null)
+          if (!open) {
+            setSelectedId(null)
+            setShowPlanForm(false)
+          }
         }}
         labelledById={detailTitleId}
         title={detailTitle}
         description={detailDescription}
         returnFocusRef={returnFocusRef}
         footer={
-          <Button type="button" className="w-full" size="lg" onClick={addToPlanHint}>
-            Legg i plan
-          </Button>
+          detailQuery.data != null && showPlanForm ? (
+            <div className="flex w-full gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                size="lg"
+                disabled={createPlannedMealMutation.isPending}
+                onClick={() => setShowPlanForm(false)}
+              >
+                Tilbake
+              </Button>
+              <Button
+                type="submit"
+                form={CHEF_PLAN_FORM_ID}
+                className="flex-1"
+                size="lg"
+                disabled={createPlannedMealMutation.isPending}
+              >
+                Lagre i plan
+              </Button>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              className="w-full"
+              size="lg"
+              disabled={detailQuery.data == null}
+              onClick={() => setShowPlanForm(true)}
+            >
+              Legg i plan
+            </Button>
+          )
         }
       >
         {detailQuery.isLoading ? (
@@ -236,7 +292,26 @@ export default function ChefRoute() {
             </Button>
           </div>
         ) : null}
-        {detailQuery.data != null ? <RecipeDetailPanel recipe={detailQuery.data} /> : null}
+        {detailQuery.data != null && showPlanForm ? (
+          <AddToPlanPanel
+            key={detailQuery.data.id}
+            formId={CHEF_PLAN_FORM_ID}
+            recipeId={detailQuery.data.id}
+            recipePortions={detailQuery.data.porsjoner}
+            householdMemberCount={householdMemberCount}
+            mealCategories={planningCategoriesForChef}
+            createMutation={createPlannedMealMutation}
+            onSaved={() => {
+              toast.success("Lagret i ukeplan.")
+              setSheetOpen(false)
+              setShowPlanForm(false)
+              setSelectedId(null)
+            }}
+          />
+        ) : null}
+        {detailQuery.data != null && !showPlanForm ? (
+          <RecipeDetailPanel recipe={detailQuery.data} />
+        ) : null}
       </DetailSheet>
     </section>
   )

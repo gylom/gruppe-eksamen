@@ -192,6 +192,13 @@ public class OppskrifterController : ControllerBase
         if (preferences.Count > 0)
             _db.Skjuloppskrifter.RemoveRange(preferences);
 
+        var plannedMeals = await _db.PlanlagteMaaltider
+            .Where(x => x.OppskriftId == id)
+            .ToListAsync();
+
+        if (plannedMeals.Count > 0)
+            _db.PlanlagteMaaltider.RemoveRange(plannedMeals);
+
         if (recipe.Ingredienser.Any())
             _db.Ingredienser.RemoveRange(recipe.Ingredienser);
 
