@@ -66,3 +66,18 @@ INSERT INTO Oppskrifter (id, navn, instruksjoner, porsjoner, user_id, kategori_i
 (56, 'Toalettpapir påfylling', 'Sett fram ny rull toalettpapir.', 1, 4, 3, NOW()),
 (57, 'Tannkrem klar til bruk', 'Legg fram tannkrem på badet.', 1, 4, 3, NOW()),
 (58, 'Øl og nøtter', 'Server øl sammen med nøtter.', 1, 4, 6, NOW());
+
+-- Placeholder images for recipe cards/details. These are intentionally reused by dish type.
+UPDATE Oppskrifter
+SET bilde = CASE
+    WHEN id IN (1, 6, 9, 16, 25, 27, 30, 31, 45, 47) THEN 'https://commons.wikimedia.org/wiki/Special:FilePath/Plate_of_Pasta_%28Unsplash%29.jpg?width=900'
+    WHEN id IN (2, 10, 12, 19, 21, 22, 32, 46) THEN 'https://commons.wikimedia.org/wiki/Special:FilePath/Fried_Chicken_%28Unsplash%29.jpg?width=900'
+    WHEN id IN (3, 13, 33, 48) THEN 'https://commons.wikimedia.org/wiki/Special:FilePath/Salmon_rice_%282917792757%29.jpg?width=900'
+    WHEN id = 4 THEN 'https://commons.wikimedia.org/wiki/Special:FilePath/Omelette.JPG?width=900'
+    WHEN id IN (5, 7, 15, 20, 26, 36, 37, 50) THEN 'https://commons.wikimedia.org/wiki/Special:FilePath/Home_prepared_yoghurt_and_muesli_with_berries.JPG?width=900'
+    WHEN id IN (8, 11, 14, 18, 23, 24, 29, 34, 35, 43, 44, 49) THEN 'https://commons.wikimedia.org/wiki/Special:FilePath/Deli_Baguette_Sandwich_%28Unsplash%29.jpg?width=900'
+    WHEN id IN (28, 42) THEN 'https://commons.wikimedia.org/wiki/Special:FilePath/Pizza_for_High-End_Italian_Restaurant_%28Unsplash%29.jpg?width=900'
+    WHEN id IN (17, 38, 39, 40, 51, 52) THEN 'https://commons.wikimedia.org/wiki/Special:FilePath/Coffee_%28Unsplash%29.jpg?width=900'
+    ELSE 'https://commons.wikimedia.org/wiki/Special:FilePath/Cookies_%28Unsplash%29.jpg?width=900'
+END
+WHERE id BETWEEN 1 AND 58;

@@ -22,6 +22,7 @@ import {
   useUpdatePlannedMealServings,
 } from "~/features/planning/use-planned-meals"
 import { useRecipeCategories } from "~/features/recipes/use-recipes"
+import { useGenerateShoppingSuggestions } from "~/features/shopping/use-shopping-suggestions"
 import { ApiError } from "~/lib/api-fetch"
 import {
   addWeeksToMondayKey,
@@ -57,6 +58,7 @@ export default function PlanRoute() {
   const excludeIngredientMutation = useExcludePlannedMealIngredient()
   const restoreIngredientMutation = useRestorePlannedMealIngredient()
   const deletePlannedMealMutation = useDeletePlannedMeal()
+  const generateShoppingSuggestions = useGenerateShoppingSuggestions()
 
   const [editingMeal, setEditingMeal] = useState<PlannedMealDto | null>(null)
   const [editServingsValue, setEditServingsValue] = useState(4)
@@ -160,6 +162,18 @@ export default function PlanRoute() {
     return Boolean(ex || re)
   }
 
+  async function runGenerateShoppingSuggestions() {
+    try {
+      const res = await generateShoppingSuggestions.mutateAsync({ weekStartDate: weekMonday })
+      toast.success(
+        `${res.suggestions.length} handleforslag fra ${res.plannedMealCount} måltid${res.plannedMealCount === 1 ? "" : "er"} (uke ${res.weekStartDate} — kun forslag, ikke lagret).`,
+      )
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Kunne ikke generere forslag."
+      toast.error(msg)
+    }
+  }
+
   async function confirmRemovePlannedMeal() {
     if (!editingMeal) return
     setDeleteProtectedReason(null)
@@ -185,36 +199,55 @@ export default function PlanRoute() {
 
   return (
     <section className="p-4 pb-28" aria-labelledby="plan-heading">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 id="plan-heading" className="font-heading text-xl font-semibold tracking-tight">
-            Ukeplan
-          </h1>
-          <p className="mt-1 text-xs text-muted-foreground">Mandag {weekMonday}</p>
+      <header className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 id="plan-heading" className="font-heading text-xl font-semibold tracking-tight">
+              Ukeplan
+            </h1>
+            <p className="mt-1 text-xs text-muted-foreground">Mandag {weekMonday}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              aria-label="Previous week"
+              onClick={() => setWeekMonday((k) => addWeeksToMondayKey(k, -1))}
+            >
+              <ChevronLeft className="size-5" aria-hidden />
+            </Button>
+            <p className="min-w-[10rem] flex-1 text-center text-sm font-medium tabular-nums">
+              {formatWeekRangeTitleNb(weekMonday)}
+            </p>
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              aria-label="Next week"
+              onClick={() => setWeekMonday((k) => addWeeksToMondayKey(k, 1))}
+            >
+              <ChevronRight className="size-5" aria-hidden />
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            aria-label="Previous week"
-            onClick={() => setWeekMonday((k) => addWeeksToMondayKey(k, -1))}
-          >
-            <ChevronLeft className="size-5" aria-hidden />
-          </Button>
-          <p className="min-w-[10rem] flex-1 text-center text-sm font-medium tabular-nums">
-            {formatWeekRangeTitleNb(weekMonday)}
-          </p>
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            aria-label="Next week"
-            onClick={() => setWeekMonday((k) => addWeeksToMondayKey(k, 1))}
-          >
-            <ChevronRight className="size-5" aria-hidden />
-          </Button>
-        </div>
+        {mealsQuery.data != null && mealsQuery.data.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3 sm:border-t-0 sm:pt-0">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={generateShoppingSuggestions.isPending || mealsQuery.isFetching}
+              aria-busy={generateShoppingSuggestions.isPending}
+              onClick={() => void runGenerateShoppingSuggestions()}
+            >
+              {generateShoppingSuggestions.isPending ? "Genererer…" : "Generer handleforslag"}
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              Les fra denne ukens plan (lagrer ikke i handleliste ennå).
+            </span>
+          </div>
+        ) : null}
       </header>
 
       <div className="mt-6 space-y-4" aria-live="polite">

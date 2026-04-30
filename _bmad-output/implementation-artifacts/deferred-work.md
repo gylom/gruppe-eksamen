@@ -1,6 +1,16 @@
 # Deferred Work
 
-## Deferred from: code review of story 2-1-recipe-discovery-and-detail-sheets (2026-04-30)
+## Deferred from: code review of story 3-1-generate-deduplicated-suggestions-from-the-weekly-plan (2026-04-30)
+
+- **`ulong` IDs serialized to JSON `number`** — pre-existing pattern across all controllers; no JS safe-integer violation at current DB scale. Revisit if IDs approach 2^53.
+- **`GetHouseholdMemberIds` internally calls `GetHouseholdId` — redundant DB round-trip** — pre-existing helper design in `HandlelisteController.cs`.
+- **`listKeySet` loads all Handleliste rows for all members into memory** — pre-existing; optimize with a server-side key filter when list size warrants it.
+- **`[Authorize]` not at controller-class level** — auth relies on `GetUserId()` null-check; pre-existing for all endpoints in `HandlelisteController.cs`.
+- **`toast.success` fires for 0-suggestion results** — edge-case UX when all planned meals have only optional/excluded ingredients; prefer `toast.info` for empty results.
+- **Generic error toast for non-`ApiError` exceptions** — swallows network aborts and navigation-induced cancellations; minor UX.
+- **Sheet overlay opacity/backdrop-blur change is global** — `bg-black/80 → bg-black/55` affects all dialogs; intentional polish bundled with Story 3.1 out of scope.
+
+
 
 - **`kategoriId=0`/unknown ids return empty list silently** — `backend/Controllers/OppskrifterController.cs` GetAll. No validation against existing categories; indistinguishable from "no recipes match".
 - **`sok` LIKE wildcards (`%`, `_`) not escaped** — `backend/Controllers/OppskrifterController.cs` GetAll. User-typed wildcards match unintended results; pre-existing pattern.

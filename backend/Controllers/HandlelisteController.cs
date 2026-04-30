@@ -4,6 +4,7 @@ using DefaultNamespace.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Security.Claims;
 
 namespace DefaultNamespace.Controllers;
@@ -85,6 +86,137 @@ public class HandlelisteController : ControllerBase
         }
 
         return Ok(new { varer = items, forslag });
+    }
+
+    /// <summary>
+    /// Read-only: aggregate planned-meal ingredients for a week. Does not insert handleliste rows.
+    /// Suggestions are sorted by ingredient name, unit label, varetype id, maaleenhet id (deterministic).
+    /// </summary>
+    [HttpPost("generate-from-week")]
+    public async Task<IActionResult> GenerateFromWeek([FromBody] GenerateShoppingSuggestionsRequest? body)
+    {
+        var raw = body?.WeekStartDate?.Trim() ?? string.Empty;
+        if (!TryParseMonday(raw, out var monday))
+            return BadRequest(new { message = "weekStartDate må være en mandag i formatet YYYY-MM-DD." });
+
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var householdId = await GetHouseholdId(userId.Value);
+        if (householdId == null)
+        {
+            return Ok(new GenerateShoppingSuggestionsResponse
+            {
+                WeekStartDate = monday.ToString("yyyy-MM-dd"),
+                PlannedMealCount = 0,
+                Suggestions = new List<ShoppingSuggestionDto>()
+            });
+        }
+
+        var memberIds = await GetHouseholdMemberIds(userId.Value);
+
+        var plannedMeals = await _db.PlanlagteMaaltider
+            .AsNoTracking()
+            .Where(x => x.HusholdningId == householdId.Value && x.UkeStartDato == monday)
+            .Include(x => x.Oppskrift!)
+            .ThenInclude(o => o.Ingredienser)
+            .ThenInclude(i => i.Varetype)
+            .Include(x => x.Oppskrift!)
+            .ThenInclude(o => o.Ingredienser)
+            .ThenInclude(i => i.Maaleenhet)
+            .AsSplitQuery()
+            .ToListAsync();
+
+        var mealIds = plannedMeals.Select(m => m.Id).ToList();
+        var exclusionRows = await _db.PlanlagteMaaltidEkskluderteIngredienser
+            .AsNoTracking()
+            .Where(e => mealIds.Contains(e.PlanlagtMaaltidId))
+            .Select(e => new { e.PlanlagtMaaltidId, e.IngrediensId })
+            .ToListAsync();
+
+        var exclusionMap = exclusionRows
+            .GroupBy(e => e.PlanlagtMaaltidId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.IngrediensId).ToHashSet());
+
+        var listKeySet = await _db.Handleliste
+            .AsNoTracking()
+            .Where(x => memberIds.Contains(x.UserId))
+            .Select(x => new { x.VaretypeId, x.MaaleenhetId })
+            .ToListAsync();
+
+        var onListKeys = listKeySet
+            .Select(x => (x.VaretypeId, x.MaaleenhetId))
+            .ToHashSet();
+
+        // Aggregate by exact (varetypeId, maaleenhetId); null unit only matches null.
+        var buckets = new Dictionary<(ulong Vt, ulong? Me), ShoppingSuggestionAccumulator>();
+
+        foreach (var meal in plannedMeals)
+        {
+            var recipe = meal.Oppskrift;
+            if (recipe?.Ingredienser == null) continue;
+
+            var excluded = exclusionMap.TryGetValue(meal.Id, out var ex) ? ex : new HashSet<ulong>();
+
+            decimal scale = 1m;
+            if (recipe.Porsjoner > 0 && meal.Porsjoner > 0)
+                scale = (decimal)meal.Porsjoner / recipe.Porsjoner;
+
+            foreach (var ing in recipe.Ingredienser)
+            {
+                if (ing.Valgfritt == true) continue;
+                if (excluded.Contains(ing.Id)) continue;
+
+                var key = (ing.VaretypeId, ing.MaaleenhetId);
+                if (!buckets.TryGetValue(key, out var acc))
+                {
+                    acc = new ShoppingSuggestionAccumulator
+                    {
+                        Varetype = ing.Varetype?.Navn ?? string.Empty,
+                        Maaleenhet = ing.Maaleenhet?.Enhet
+                    };
+                    buckets[key] = acc;
+                }
+
+                decimal? scaledQty = null;
+                if (ing.Kvantitet.HasValue)
+                    scaledQty = ing.Kvantitet.Value * scale;
+
+                acc.AddMeal(meal.Id, scaledQty);
+            }
+        }
+
+        var suggestions = buckets
+            .Select(pair =>
+            {
+                var ((vtId, meId), acc) = pair;
+                var onList = onListKeys.Contains((vtId, meId));
+                return new ShoppingSuggestionDto
+                {
+                    ClientId = $"{vtId}:{(meId.HasValue ? meId.Value.ToString(CultureInfo.InvariantCulture) : "none")}",
+                    VaretypeId = vtId,
+                    Varetype = acc.Varetype,
+                    Kvantitet = acc.AggregatedQuantity,
+                    MaaleenhetId = meId,
+                    Maaleenhet = acc.Maaleenhet,
+                    SourceCount = acc.SourceCount,
+                    PlannedMealIds = acc.PlannedMealIds.OrderBy(id => id).ToList(),
+                    AlreadyOnList = onList,
+                    SelectedByDefault = !onList
+                };
+            })
+            .OrderBy(s => s.Varetype, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(s => s.Maaleenhet ?? "\uFFFF")
+            .ThenBy(s => s.VaretypeId)
+            .ThenBy(s => s.MaaleenhetId ?? ulong.MaxValue)
+            .ToList();
+
+        return Ok(new GenerateShoppingSuggestionsResponse
+        {
+            WeekStartDate = monday.ToString("yyyy-MM-dd"),
+            PlannedMealCount = plannedMeals.Count(m => m.Oppskrift != null),
+            Suggestions = suggestions
+        });
     }
 
     [HttpPost]
@@ -172,5 +304,51 @@ public class HandlelisteController : ControllerBase
         var householdId = await GetHouseholdId(userId);
         if (householdId == null) return new List<ulong>();
         return await _db.Medlemmer.Where(x => x.HusholdningId == householdId.Value).Select(x => x.UserId).ToListAsync();
+    }
+
+    /// <summary>
+    /// One aggregated bucket.
+    /// <see cref="SourceCount"/> = total recipe ingredient rows contributed (may exceed <see cref="PlannedMealIds"/>.Count
+    /// when one recipe has multiple rows with the same varetype+unit key).
+    /// Quantity is null if any contributing ingredient row lacked a numeric amount.
+    /// </summary>
+    private sealed class ShoppingSuggestionAccumulator
+    {
+        public required string Varetype { get; init; }
+        public string? Maaleenhet { get; init; }
+
+        public int SourceCount { get; private set; }
+        public HashSet<ulong> PlannedMealIds { get; } = new();
+
+        private bool _anyNullQuantityLine;
+        private decimal _numericSum;
+
+        public void AddMeal(ulong plannedMealId, decimal? scaledQuantity)
+        {
+            SourceCount++;
+            PlannedMealIds.Add(plannedMealId);
+            if (!scaledQuantity.HasValue)
+                _anyNullQuantityLine = true;
+            else
+                _numericSum += scaledQuantity.Value;
+        }
+
+        public decimal? AggregatedQuantity => _anyNullQuantityLine ? null : _numericSum;
+    }
+
+    private static bool TryParseMonday(string weekStartDate, out DateOnly monday)
+    {
+        monday = default;
+        if (!DateOnly.TryParseExact(
+                weekStartDate,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var d))
+            return false;
+        if (d.DayOfWeek != DayOfWeek.Monday)
+            return false;
+        monday = d;
+        return true;
     }
 }

@@ -41,11 +41,11 @@ export function DetailSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
-        side="bottom"
+        side="floating-bottom"
         showCloseButton
         aria-labelledby={labelledById}
         className={cn(
-          "flex max-h-[min(90dvh,640px)] min-h-0 flex-col gap-0 rounded-t-3xl p-0 sm:max-w-[480px]",
+          "flex max-h-[calc(100dvh-7rem-env(safe-area-inset-bottom,0px))] min-h-0 w-[calc(100vw-2rem)] max-w-[480px] flex-col gap-0 overflow-hidden rounded-2xl p-0",
         )}
       >
         <SheetHeader className="shrink-0 border-b border-border pb-4 text-left">

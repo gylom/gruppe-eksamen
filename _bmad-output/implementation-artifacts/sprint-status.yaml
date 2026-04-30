@@ -1,5 +1,5 @@
 # generated: 2026-04-30
-# last_updated: 2026-04-30 (story 2.3 done)
+# last_updated: 2026-04-30 (story 3.1 done — review patches applied)
 # project: gruppe-eksamen
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-30
-last_updated: 2026-04-30 (story 2.3 done)
+last_updated: 2026-04-30 (story 3.1 done — review patches applied)
 project: gruppe-eksamen
 project_key: NOKEY
 tracking_system: file-system
@@ -55,8 +55,8 @@ development_status:
   2-3-ingredient-exclusions-and-planned-meal-protection: done
   epic-2-retrospective: optional
 
-  epic-3: backlog
-  3-1-generate-deduplicated-suggestions-from-the-weekly-plan: backlog
+  epic-3: in-progress
+  3-1-generate-deduplicated-suggestions-from-the-weekly-plan: done
   3-2-review-and-confirm-selected-suggestions: backlog
   epic-3-retrospective: optional
 
