@@ -17,6 +17,11 @@ public class AddMemberRequest
     public string Rolle { get; set; } = "medlem";
 }
 
+public class JoinHouseholdRequest
+{
+    public string Code { get; set; } = string.Empty;
+}
+
 public class CreatePlacementRequest
 {
     public string Plassering { get; set; } = string.Empty;

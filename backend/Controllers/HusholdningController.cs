@@ -1,3 +1,6 @@
+using System.Data;
+using System.Security.Cryptography;
+using System.Text;
 using DefaultNamespace.Data;
 using DefaultNamespace.DTOs;
 using DefaultNamespace.Models;
@@ -13,6 +16,10 @@ namespace DefaultNamespace.Controllers;
 [Route("api/husholdning")]
 public class HusholdningController : ControllerBase
 {
+    private const string InviteAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+    private const int InviteCodeLength = 6;
+    private static readonly TimeSpan InviteLifetime = TimeSpan.FromDays(7);
+
     private readonly AppDbContext _db;
     public HusholdningController(AppDbContext db) => _db = db;
 
@@ -27,7 +34,13 @@ public class HusholdningController : ControllerBase
             .FirstOrDefaultAsync(x => x.UserId == userId.Value);
 
         if (medlemskap == null || medlemskap.Husholdning == null)
-            return Ok(new { household = (object?)null, medlemmer = Array.Empty<object>(), plasseringer = Array.Empty<object>() });
+            return Ok(new
+            {
+                household = (object?)null,
+                medlemmer = Array.Empty<object>(),
+                plasseringer = Array.Empty<object>(),
+                activeInvite = (object?)null
+            });
 
         var medlemmer = await _db.Medlemmer
             .Where(x => x.HusholdningId == medlemskap.HusholdningId)
@@ -52,6 +65,23 @@ public class HusholdningController : ControllerBase
             })
             .ToListAsync();
 
+        object? activeInvite = null;
+        if (string.Equals(medlemskap.Rolle, "eier", StringComparison.OrdinalIgnoreCase))
+        {
+            var now = DateTime.UtcNow;
+            var active = await _db.HusholdningInvitasjoner
+                .AsNoTracking()
+                .Where(i => i.HusholdningId == medlemskap.HusholdningId
+                    && i.RevokedAt == null
+                    && i.UsedAt == null
+                    && i.ExpiresAt > now)
+                .OrderByDescending(i => i.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            if (active != null)
+                activeInvite = new { code = active.Kode, expiresAt = active.ExpiresAt };
+        }
+
         return Ok(new
         {
             household = new
@@ -61,7 +91,8 @@ public class HusholdningController : ControllerBase
                 minRolle = medlemskap.Rolle
             },
             medlemmer,
-            plasseringer
+            plasseringer,
+            activeInvite
         });
     }
 
@@ -73,7 +104,8 @@ public class HusholdningController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Navn)) return BadRequest(new { message = "Navn er påkrevd." });
 
         var existingMembership = await _db.Medlemmer.AnyAsync(x => x.UserId == userId.Value);
-        if (existingMembership) return BadRequest(new { message = "Brukeren er allerede medlem av en husholdning." });
+        if (existingMembership)
+            return Conflict(new { message = "Brukeren er allerede medlem av en husholdning." });
 
         await using var tx = await _db.Database.BeginTransactionAsync();
 
@@ -97,6 +129,145 @@ public class HusholdningController : ControllerBase
         await tx.CommitAsync();
 
         return Ok(new { message = "Husholdning opprettet.", id = household.Id, navn = household.Navn });
+    }
+
+    [HttpPost("join")]
+    public async Task<IActionResult> JoinHusholdning(JoinHouseholdRequest request)
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        if (!TryNormalizeInviteCode(request.Code, out var normalized, out var normalizeError))
+            return Conflict(new { message = normalizeError ?? "Ugyldig invitasjonskode." });
+
+        if (await _db.Medlemmer.AnyAsync(x => x.UserId == userId.Value))
+            return Conflict(new { message = "Brukeren er allerede medlem av en husholdning." });
+
+        await using var tx = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+
+        var invite = await _db.HusholdningInvitasjoner
+            .FirstOrDefaultAsync(i => i.Kode == normalized);
+
+        if (invite == null)
+        {
+            await tx.RollbackAsync();
+            return Conflict(new { message = "Ugyldig invitasjonskode." });
+        }
+
+        if (invite.RevokedAt != null)
+        {
+            await tx.RollbackAsync();
+            return Conflict(new { message = "Invitasjonskoden er trukket tilbake." });
+        }
+
+        if (invite.UsedAt != null)
+        {
+            await tx.RollbackAsync();
+            return Conflict(new { message = "Invitasjonskoden er allerede brukt." });
+        }
+
+        var now = DateTime.UtcNow;
+        if (invite.ExpiresAt <= now)
+        {
+            await tx.RollbackAsync();
+            return Conflict(new { message = "Invitasjonskoden er utløpt." });
+        }
+
+        _db.Medlemmer.Add(new Medlem
+        {
+            HusholdningId = invite.HusholdningId,
+            UserId = userId.Value,
+            Rolle = "medlem"
+        });
+
+        invite.UsedAt = now;
+        invite.UsedByUserId = userId.Value;
+
+        await _db.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        return Ok(new { message = "Du er nå medlem av husholdningen." });
+    }
+
+    [HttpPost("invitasjon")]
+    public async Task<IActionResult> GenerateInvitasjon()
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var membership = await _db.Medlemmer.FirstOrDefaultAsync(x => x.UserId == userId.Value);
+        if (membership == null)
+            return BadRequest(new { message = "Brukeren er ikke medlem av en husholdning." });
+        if (!string.Equals(membership.Rolle, "eier", StringComparison.OrdinalIgnoreCase))
+            return Forbid();
+
+        await using var tx = await _db.Database.BeginTransactionAsync();
+
+        var toRevoke = await _db.HusholdningInvitasjoner
+            .Where(i => i.HusholdningId == membership.HusholdningId
+                && i.RevokedAt == null
+                && i.UsedAt == null)
+            .ToListAsync();
+
+        var revokeTime = DateTime.UtcNow;
+        foreach (var row in toRevoke)
+            row.RevokedAt = revokeTime;
+
+        if (toRevoke.Count > 0)
+            await _db.SaveChangesAsync();
+
+        const int maxAttempts = 24;
+        for (var attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            var code = GenerateInviteCode();
+            if (await _db.HusholdningInvitasjoner.AnyAsync(i => i.Kode == code))
+                continue;
+
+            _db.HusholdningInvitasjoner.Add(new HusholdningInvitasjon
+            {
+                HusholdningId = membership.HusholdningId,
+                Kode = code,
+                CreatedByUserId = userId.Value,
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.Add(InviteLifetime)
+            });
+
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
+            return Ok(new { message = "Ny invitasjonskode er opprettet." });
+        }
+
+        await tx.RollbackAsync();
+        return StatusCode(500, new { message = "Kunne ikke generere invitasjonskode. Prøv igjen." });
+    }
+
+    [HttpDelete("invitasjon")]
+    public async Task<IActionResult> RevokeInvitasjon()
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var membership = await _db.Medlemmer.FirstOrDefaultAsync(x => x.UserId == userId.Value);
+        if (membership == null)
+            return BadRequest(new { message = "Brukeren er ikke medlem av en husholdning." });
+        if (!string.Equals(membership.Rolle, "eier", StringComparison.OrdinalIgnoreCase))
+            return Forbid();
+
+        var actives = await _db.HusholdningInvitasjoner
+            .Where(i => i.HusholdningId == membership.HusholdningId
+                && i.RevokedAt == null
+                && i.UsedAt == null)
+            .ToListAsync();
+
+        if (actives.Count == 0)
+            return NotFound(new { message = "Ingen aktiv invitasjon." });
+
+        var now = DateTime.UtcNow;
+        foreach (var row in actives)
+            row.RevokedAt = now;
+
+        await _db.SaveChangesAsync();
+        return Ok(new { message = "Invitasjonen er trukket tilbake." });
     }
 
     [HttpPut]
@@ -324,6 +495,52 @@ public class HusholdningController : ControllerBase
         await tx.CommitAsync();
 
         return Ok(new { message = "Du har forlatt husholdningen." });
+    }
+
+    private static string GenerateInviteCode()
+    {
+        var bytes = new byte[InviteCodeLength];
+        RandomNumberGenerator.Fill(bytes);
+        var chars = new char[InviteCodeLength];
+        for (var i = 0; i < InviteCodeLength; i++)
+            chars[i] = InviteAlphabet[bytes[i] % InviteAlphabet.Length];
+        return new string(chars);
+    }
+
+    private static bool TryNormalizeInviteCode(string? raw, out string normalized, out string? errorMessage)
+    {
+        normalized = string.Empty;
+        errorMessage = null;
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            errorMessage = "Invitasjonskode er påkrevd.";
+            return false;
+        }
+
+        var sb = new StringBuilder();
+        foreach (var c in raw.Trim())
+        {
+            if (c == ' ' || c == '-') continue;
+            sb.Append(char.ToUpperInvariant(c));
+        }
+
+        normalized = sb.ToString();
+        if (normalized.Length != InviteCodeLength)
+        {
+            errorMessage = "Invitasjonskoden må være nøyaktig 6 tegn.";
+            return false;
+        }
+
+        foreach (var c in normalized)
+        {
+            if (InviteAlphabet.IndexOf(c) < 0)
+            {
+                errorMessage = "Invitasjonskoden inneholder ugyldige tegn.";
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private ulong? GetUserId()

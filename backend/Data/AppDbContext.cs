@@ -12,6 +12,7 @@ public class AppDbContext : DbContext
     public DbSet<Bruker> Brukere => Set<Bruker>();
     public DbSet<Husholdning> Husholdninger => Set<Husholdning>();
     public DbSet<Medlem> Medlemmer => Set<Medlem>();
+    public DbSet<HusholdningInvitasjon> HusholdningInvitasjoner => Set<HusholdningInvitasjon>();
     public DbSet<Varekategori> Varekategorier => Set<Varekategori>();
     public DbSet<Varetype> Varetyper => Set<Varetype>();
     public DbSet<Maaleenhet> Maaleenheter => Set<Maaleenhet>();
@@ -33,6 +34,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Bruker>().ToTable("Brukere");
         modelBuilder.Entity<Husholdning>().ToTable("Husholdning");
         modelBuilder.Entity<Medlem>().ToTable("Medlemmer");
+        modelBuilder.Entity<HusholdningInvitasjon>().ToTable("HusholdningInvitasjon");
         modelBuilder.Entity<Varekategori>().ToTable("Varekategori");
         modelBuilder.Entity<Varetype>().ToTable("Varetyper");
         modelBuilder.Entity<Maaleenhet>().ToTable("Maaleenheter");
@@ -64,6 +66,34 @@ public class AppDbContext : DbContext
             .HasOne(x => x.Bruker)
             .WithMany(x => x.Medlemskap)
             .HasForeignKey(x => x.UserId);
+
+        modelBuilder.Entity<HusholdningInvitasjon>()
+            .HasOne(x => x.Husholdning)
+            .WithMany()
+            .HasForeignKey(x => x.HusholdningId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<HusholdningInvitasjon>()
+            .HasOne(x => x.CreatedByBruker)
+            .WithMany()
+            .HasForeignKey(x => x.CreatedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<HusholdningInvitasjon>()
+            .HasOne(x => x.UsedByBruker)
+            .WithMany()
+            .HasForeignKey(x => x.UsedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<HusholdningInvitasjon>()
+            .HasIndex(x => x.Kode)
+            .IsUnique();
+
+        modelBuilder.Entity<HusholdningInvitasjon>()
+            .HasIndex(x => x.HusholdningId);
+
+        modelBuilder.Entity<HusholdningInvitasjon>()
+            .HasIndex(x => new { x.HusholdningId, x.RevokedAt, x.UsedAt, x.ExpiresAt });
 
         modelBuilder.Entity<Varetype>()
             .HasOne(x => x.Kategori)
