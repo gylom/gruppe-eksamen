@@ -12,6 +12,10 @@ Always install shadcn components via CLI, e.g. **pnpm dlx shadcn@latest add [com
 
 Always use Context7 when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
 
+## Git branching
+
+**Only use `feature/frontend-rebuild` for ongoing work.** Do not create new branches (story branches, sub-feature branches, etc.) unless I explicitly ask. If you find yourself on a different branch with uncommitted changes, stop and ask before committing — never commit to or create a new branch on your own initiative.
+
 ## No markdown files context polution
 
 Ignore everything in:
