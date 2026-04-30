@@ -1,4 +1,5 @@
 import { useEffect } from "react"
+import { useTranslation } from "react-i18next"
 import { Outlet, useNavigate } from "react-router"
 
 import { AppShell } from "~/components/AppShell"
@@ -7,6 +8,7 @@ import { useMe } from "~/features/auth/use-me"
 import { getToken } from "~/lib/auth"
 
 export default function AppLayoutRoute() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const me = useMe()
   const hasToken = getToken() !== null
@@ -35,7 +37,7 @@ export default function AppLayoutRoute() {
   if (me.isLoading) {
     return (
       <AppShell reserveNav>
-        <section className="space-y-5 p-4" aria-label="Laster konto">
+        <section className="space-y-5 p-4" aria-label={t("appLayout.loadingAccount")}>
           <div className="h-7 w-36 animate-pulse rounded-md bg-muted" />
           <div className="space-y-3">
             <div className="h-28 animate-pulse rounded-lg bg-muted" />
@@ -51,11 +53,11 @@ export default function AppLayoutRoute() {
       <AppShell reserveNav>
         <section className="flex min-h-[320px] flex-col justify-center gap-4 p-4">
           <div>
-            <h1 className="text-lg font-semibold">Kunne ikke laste konto.</h1>
-            <p className="text-sm text-muted-foreground">Prøv igjen.</p>
+            <h1 className="text-lg font-semibold">{t("appLayout.loadErrorTitle")}</h1>
+            <p className="text-sm text-muted-foreground">{t("onboarding.tryAgainHint")}</p>
           </div>
           <Button className="w-fit" disabled={me.isFetching} onClick={() => void me.refetch()}>
-            Prøv igjen
+            {t("common.retry")}
           </Button>
         </section>
       </AppShell>

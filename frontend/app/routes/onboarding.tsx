@@ -1,7 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useQueryClient } from "@tanstack/react-query"
-import { useEffect } from "react"
+import { useEffect, useMemo } from "react"
 import { Controller, useForm } from "react-hook-form"
+import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -16,21 +17,11 @@ import { useCreateHousehold, useJoinHousehold } from "~/features/household/use-h
 import { ApiError } from "~/lib/api-fetch"
 import { getToken } from "~/lib/auth"
 
-const createSchema = z.object({
-  navn: z.string().trim().min(1, "Gi husholdningen et navn."),
-})
-
-const joinSchema = z.object({
-  code: z
-    .string()
-    .length(6, "Koden må være nøyaktig 6 tegn.")
-    .regex(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/, "Kun tillatte tegn (ingen I, L, O, 0 eller 1)."),
-})
-
-type CreateValues = z.infer<typeof createSchema>
-type JoinValues = z.infer<typeof joinSchema>
+type CreateValues = { navn: string }
+type JoinValues = { code: string }
 
 export default function OnboardingRoute() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const logout = useLogout()
@@ -38,8 +29,24 @@ export default function OnboardingRoute() {
   const createHousehold = useCreateHousehold()
   const joinHousehold = useJoinHousehold()
 
-  const hasToken = getToken() !== null
-  const hasHousehold = me.data != null && me.data.householdId != null
+  const createSchema = useMemo(
+    () =>
+      z.object({
+        navn: z.string().trim().min(1, t("validation.householdName")),
+      }),
+    [t]
+  )
+
+  const joinSchema = useMemo(
+    () =>
+      z.object({
+        code: z
+          .string()
+          .length(6, t("validation.inviteLength"))
+          .regex(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/, t("validation.inviteChars")),
+      }),
+    [t]
+  )
 
   const createForm = useForm<CreateValues>({
     resolver: zodResolver(createSchema),
@@ -52,6 +59,9 @@ export default function OnboardingRoute() {
     defaultValues: { code: "" },
     mode: "onChange",
   })
+
+  const hasToken = getToken() !== null
+  const hasHousehold = me.data != null && me.data.householdId != null
 
   useEffect(() => {
     if (!hasToken) {
@@ -81,9 +91,9 @@ export default function OnboardingRoute() {
     createForm.clearErrors("root")
     try {
       await createHousehold.mutateAsync({ navn: values.navn.trim() })
-      await refreshMeAndGoApp("Husholdning opprettet")
+      await refreshMeAndGoApp(t("onboarding.toastCreated"))
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Noe gikk galt."
+      const msg = err instanceof ApiError ? err.message : t("onboarding.oops")
       createForm.setError("root", { message: msg })
     }
   }
@@ -92,9 +102,9 @@ export default function OnboardingRoute() {
     joinForm.clearErrors("root")
     try {
       await joinHousehold.mutateAsync({ code: values.code })
-      await refreshMeAndGoApp("Du er med i husholdningen")
+      await refreshMeAndGoApp(t("onboarding.toastJoined"))
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Noe gikk galt."
+      const msg = err instanceof ApiError ? err.message : t("onboarding.oops")
       joinForm.setError("root", { message: msg })
     }
   }
@@ -106,7 +116,7 @@ export default function OnboardingRoute() {
   if (me.isLoading) {
     return (
       <main className="mx-auto flex min-h-svh w-full max-w-sm flex-col justify-center px-4 py-8">
-        <div className="space-y-3" aria-label="Laster onboarding">
+        <div className="space-y-3" aria-label={t("onboarding.loading")}>
           <div className="h-7 w-32 animate-pulse rounded-md bg-muted" />
           <div className="h-16 animate-pulse rounded-lg bg-muted" />
         </div>
@@ -119,11 +129,11 @@ export default function OnboardingRoute() {
       <main className="mx-auto flex min-h-svh w-full max-w-sm flex-col justify-center px-4 py-8">
         <section className="space-y-4">
           <div>
-            <h1 className="text-lg font-semibold">Kunne ikke laste konto.</h1>
-            <p className="text-sm text-muted-foreground">Prøv igjen.</p>
+            <h1 className="text-lg font-semibold">{t("onboarding.loadErrorTitle")}</h1>
+            <p className="text-sm text-muted-foreground">{t("onboarding.tryAgainHint")}</p>
           </div>
           <Button className="w-fit" disabled={me.isFetching} onClick={() => void me.refetch()}>
-            Prøv igjen
+            {t("common.retry")}
           </Button>
         </section>
       </main>
@@ -140,11 +150,9 @@ export default function OnboardingRoute() {
       />
       <div className="relative mx-auto flex w-full max-w-sm flex-col gap-8 px-4 py-10">
         <header className="space-y-2">
-          <p className="text-xs font-medium tracking-[0.2em] text-muted-foreground uppercase">Steg 1 av 1</p>
-          <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">Sett opp husholdning</h1>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Opprett ny husholdning eller lim inn invitasjonskode du har fått av eier.
-          </p>
+          <p className="text-xs font-medium tracking-[0.2em] text-muted-foreground uppercase">{t("onboarding.stepLabel")}</p>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">{t("onboarding.title")}</h1>
+          <p className="text-sm leading-relaxed text-muted-foreground">{t("onboarding.subtitle")}</p>
         </header>
 
         <section
@@ -152,16 +160,16 @@ export default function OnboardingRoute() {
           aria-labelledby="create-heading"
         >
           <h2 id="create-heading" className="font-heading text-base font-medium">
-            Opprett husholdning
+            {t("onboarding.createTitle")}
           </h2>
-          <p className="mt-1 text-xs text-muted-foreground">Du blir eier og kan invitere andre senere.</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("onboarding.createHint")}</p>
           <form className="mt-4 space-y-3" onSubmit={createForm.handleSubmit(onCreate)} noValidate>
             <div className="space-y-2">
-              <Label htmlFor="onboarding-house-name">Navn</Label>
+              <Label htmlFor="onboarding-house-name">{t("onboarding.nameLabel")}</Label>
               <Input
                 id="onboarding-house-name"
                 autoComplete="organization"
-                placeholder="F.eks. Kollektivet"
+                placeholder={t("onboarding.namePlaceholder")}
                 disabled={busy}
                 {...createForm.register("navn")}
                 aria-invalid={!!createForm.formState.errors.navn}
@@ -178,7 +186,7 @@ export default function OnboardingRoute() {
               </p>
             )}
             <Button type="submit" className="w-full" disabled={busy}>
-              {createHousehold.isPending ? "Oppretter…" : "Opprett og fortsett"}
+              {createHousehold.isPending ? t("onboarding.creating") : t("onboarding.createSubmit")}
             </Button>
           </form>
         </section>
@@ -188,12 +196,12 @@ export default function OnboardingRoute() {
           aria-labelledby="join-heading"
         >
           <h2 id="join-heading" className="font-heading text-base font-medium">
-            Bli med i husholdning
+            {t("onboarding.joinTitle")}
           </h2>
-          <p className="mt-1 text-xs text-muted-foreground">6 tegn, store bokstaver og tall (ingen I/L/O/0/1).</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("onboarding.joinHint")}</p>
           <form className="mt-4 space-y-3" onSubmit={joinForm.handleSubmit(onJoin)} noValidate>
             <div className="space-y-2">
-              <Label htmlFor="onboarding-invite-code">Invitasjonskode</Label>
+              <Label htmlFor="onboarding-invite-code">{t("onboarding.codeLabel")}</Label>
               <Controller
                 name="code"
                 control={joinForm.control}
@@ -224,15 +232,15 @@ export default function OnboardingRoute() {
               </p>
             )}
             <Button type="submit" variant="secondary" className="w-full" disabled={busy}>
-              {joinHousehold.isPending ? "Melder inn…" : "Bli med"}
+              {joinHousehold.isPending ? t("onboarding.joining") : t("onboarding.joinSubmit")}
             </Button>
           </form>
         </section>
 
         <footer className="flex flex-col gap-3 border-t border-border/60 pt-4">
-          <p className="text-center text-xs text-muted-foreground">Feil konto?</p>
+          <p className="text-center text-xs text-muted-foreground">{t("onboarding.wrongAccount")}</p>
           <Button type="button" variant="outline" className="w-full" onClick={logout}>
-            Logg ut
+            {t("common.logout")}
           </Button>
         </footer>
       </div>

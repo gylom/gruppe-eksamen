@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react"
 import { Search } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { DetailSheet } from "~/components/detail-sheet"
@@ -30,6 +31,7 @@ const EXCLUDED_FILTER_CATEGORY_IDS = new Set([4, 5, 6])
 const CHEF_PLAN_FORM_ID = "chef-add-plan-form"
 
 export default function ChefRoute() {
+  const { t } = useTranslation()
   const searchInputId = "chef-recipe-search"
   const detailTitleId = "chef-recipe-detail-title"
 
@@ -104,14 +106,14 @@ export default function ChefRoute() {
     <section className="p-4" aria-labelledby="chef-heading">
       <div className="space-y-1">
         <h1 id="chef-heading" className="font-heading text-xl font-semibold tracking-tight">
-          Kjøkken
+          {t("chef.title")}
         </h1>
-        <p className="text-sm text-muted-foreground">Finn oppskrifter og åpne detaljer her.</p>
+        <p className="text-sm text-muted-foreground">{t("chef.subtitle")}</p>
       </div>
 
       <div className="mt-6 space-y-3">
         <Label htmlFor={searchInputId} className="text-foreground">
-          Søk i oppskrifter
+          {t("chef.searchInRecipes")}
         </Label>
         <div className="relative">
           <Search
@@ -122,7 +124,7 @@ export default function ChefRoute() {
             id={searchInputId}
             type="search"
             autoComplete="off"
-            placeholder="Søk på navn eller ingrediens"
+            placeholder={t("chef.searchPlaceholder")}
             className="pl-10"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -134,7 +136,7 @@ export default function ChefRoute() {
         <div
           className="flex flex-wrap gap-2"
           role="group"
-          aria-label="Filtrer etter måltidstype"
+          aria-label={t("chef.filterMealType")}
         >
           <Button
             type="button"
@@ -143,10 +145,10 @@ export default function ChefRoute() {
             aria-pressed={kategoriId == null}
             onClick={() => setKategoriId(null)}
           >
-            Alle
+            {t("chef.all")}
           </Button>
           {categoriesQuery.isLoading ? (
-            <span className="text-xs text-muted-foreground">Laster filtre…</span>
+            <span className="text-xs text-muted-foreground">{t("chef.loadingFilters")}</span>
           ) : null}
           {filterCategories.map((c) => {
             const selected = kategoriId === c.id

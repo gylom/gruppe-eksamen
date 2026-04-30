@@ -1,5 +1,6 @@
 import { Copy } from "lucide-react"
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { Button } from "~/components/ui/button"
@@ -11,9 +12,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog"
+import {
+  LanguagePreferenceControl,
+  SettingSection,
+  ThemePreferenceControl,
+} from "~/features/settings"
+import { useLogout } from "~/features/auth/use-logout"
 import { useMe } from "~/features/auth/use-me"
 import { formatInviteForDisplay } from "~/features/household/invite-input"
 import { useGenerateInvite, useHousehold, useRevokeInvite } from "~/features/household/use-household"
+import { getDateLocaleTag } from "~/lib/i18n"
 import { ApiError } from "~/lib/api-fetch"
 
 function errorMessage(err: unknown, fallback: string): string {
@@ -21,9 +29,9 @@ function errorMessage(err: unknown, fallback: string): string {
   return fallback
 }
 
-function formatExpires(iso: string): string {
+function formatExpires(iso: string, localeTag: string): string {
   try {
-    return new Date(iso).toLocaleString("nb-NO", {
+    return new Date(iso).toLocaleString(localeTag, {
       dateStyle: "medium",
       timeStyle: "short",
     })
@@ -33,48 +41,51 @@ function formatExpires(iso: string): string {
 }
 
 export default function AccountRoute() {
+  const { t, i18n } = useTranslation()
   const me = useMe()
   const household = useHousehold()
   const generateInvite = useGenerateInvite()
   const revokeInvite = useRevokeInvite()
+  const logout = useLogout()
   const [revokeOpen, setRevokeOpen] = useState(false)
 
   const isOwner = me.data?.householdRole === "eier"
   const hName = household.data?.household?.navn ?? me.data?.householdName ?? ""
   const active = household.data?.activeInvite
   const inviteBusy = generateInvite.isPending || revokeInvite.isPending
+  const dateLocale = getDateLocaleTag(i18n.language)
 
   async function handleGenerate(successMessage: string) {
     try {
       await generateInvite.mutateAsync()
       toast.success(successMessage)
     } catch (err) {
-      toast.error(errorMessage(err, "Kunne ikke generere kode."))
+      toast.error(errorMessage(err, t("account.errGenerate")))
     }
   }
 
   async function handleRevoke() {
     try {
       await revokeInvite.mutateAsync()
-      toast.success("Invitasjon trukket tilbake")
+      toast.success(t("account.toastRevoked"))
       setRevokeOpen(false)
     } catch (err) {
-      toast.error(errorMessage(err, "Kunne ikke trekke tilbake invitasjon."))
+      toast.error(errorMessage(err, t("account.errRevoke")))
     }
   }
 
   async function copyCode(code: string) {
     try {
       await navigator.clipboard.writeText(code)
-      toast.success("Kode kopiert")
+      toast.success(t("account.toastCopied"))
     } catch {
-      toast.error("Kunne ikke kopiere")
+      toast.error(t("account.errCopy"))
     }
   }
 
   if (household.isLoading || me.isLoading) {
     return (
-      <section className="space-y-5 p-4" aria-label="Laster husholdning">
+      <section className="space-y-5 p-4" aria-label={t("account.loadingHousehold")}>
         <div className="h-7 w-40 animate-pulse rounded-md bg-muted" />
         <div className="h-32 animate-pulse rounded-2xl bg-muted" />
         <div className="h-48 animate-pulse rounded-2xl bg-muted" />
@@ -86,11 +97,11 @@ export default function AccountRoute() {
     return (
       <section className="flex min-h-[280px] flex-col justify-center gap-4 p-4">
         <div>
-          <h1 className="text-lg font-semibold">Kunne ikke laste husholdning</h1>
-          <p className="text-sm text-muted-foreground">Prøv igjen.</p>
+          <h1 className="text-lg font-semibold">{t("account.loadErrorTitle")}</h1>
+          <p className="text-sm text-muted-foreground">{t("onboarding.tryAgainHint")}</p>
         </div>
         <Button className="w-fit" onClick={() => void household.refetch()}>
-          Prøv igjen
+          {t("common.retry")}
         </Button>
       </section>
     )
@@ -99,48 +110,57 @@ export default function AccountRoute() {
   return (
     <section className="space-y-8 p-4 pb-10">
       <header className="space-y-1">
-        <h1 className="font-heading text-xl font-semibold tracking-tight">Husholdning</h1>
-        <p className="text-sm text-muted-foreground">Medlemmer og invitasjoner for denne kontoen.</p>
+        <h1 className="font-heading text-xl font-semibold tracking-tight">{t("account.pageTitle")}</h1>
+        <p className="text-sm text-muted-foreground">{t("account.pageSubtitle")}</p>
       </header>
 
-      <div className="ring-foreground/8 rounded-3xl bg-card/80 p-5 shadow-sm ring-1">
-        <h2 className="text-sm font-medium text-muted-foreground">Navn</h2>
+      <SettingSection title={t("account.userSection")}>
+        <div className="space-y-2 text-sm">
+          <div>
+            <p className="text-xs font-medium text-muted-foreground">{t("account.username")}</p>
+            <p className="mt-0.5 font-medium">{me.data?.brukernavn ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-muted-foreground">{t("account.email")}</p>
+            <p className="mt-0.5 break-all">{me.data?.email ?? "—"}</p>
+          </div>
+        </div>
+      </SettingSection>
+
+      <SettingSection title={t("account.householdSection")}>
+        <h2 className="text-sm font-medium text-muted-foreground">{t("account.nameLabel")}</h2>
         <p className="mt-1 font-heading text-lg font-semibold">{hName || "—"}</p>
         <p className="mt-2 text-xs text-muted-foreground">
-          Din rolle:{" "}
-          <span className="text-foreground">{me.data?.householdRole === "eier" ? "Eier" : "Medlem"}</span>
+          {t("account.yourRole")}{" "}
+          <span className="text-foreground">
+            {me.data?.householdRole === "eier" ? t("account.roleOwner") : t("account.roleMember")}
+          </span>
         </p>
-      </div>
+      </SettingSection>
 
-      <div className="ring-foreground/8 rounded-3xl bg-card/80 p-5 shadow-sm ring-1">
-        <h2 className="font-heading text-base font-medium">Medlemmer</h2>
-        <ul className="mt-4 divide-y divide-border/80" aria-label="Medlemsliste">
+      <SettingSection title={t("account.membersTitle")}>
+        <ul className="divide-y divide-border/80" aria-label={t("account.membersListLabel")}>
           {household.data?.medlemmer.map((m) => (
             <li key={m.userId} className="flex flex-wrap items-baseline justify-between gap-2 py-3 first:pt-0 last:pb-0">
-              <div>
+              <div className="min-w-0">
                 <p className="font-medium">
                   {m.brukernavn}
-                  {m.erMeg ? <span className="text-muted-foreground"> (deg)</span> : null}
+                  {m.erMeg ? <span className="text-muted-foreground"> ({t("common.you")})</span> : null}
                 </p>
                 <p className="text-xs text-muted-foreground">{m.email}</p>
               </div>
               <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                {m.rolle === "eier" ? "Eier" : "Medlem"}
+                {m.rolle === "eier" ? t("account.roleOwner") : t("account.roleMember")}
               </span>
             </li>
           ))}
         </ul>
-      </div>
+      </SettingSection>
 
       {isOwner ? (
-        <div className="ring-foreground/8 rounded-3xl bg-card/80 p-5 shadow-sm ring-1">
-          <h2 className="font-heading text-base font-medium">Invitasjonskode</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            En aktiv kode varer 7 dager og kan bare brukes én gang. Ny kode erstatter den forrige.
-          </p>
-
+        <SettingSection title={t("account.inviteTitle")} description={t("account.inviteHelp")}>
           {active ? (
-            <div className="mt-4 space-y-3">
+            <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <code
                   className="rounded-xl bg-muted px-3 py-2 font-mono text-lg tracking-[0.18em]"
@@ -156,19 +176,21 @@ export default function AccountRoute() {
                   onClick={() => void copyCode(active.code)}
                 >
                   <Copy className="size-4" aria-hidden />
-                  Kopier
+                  {t("common.copy")}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">Utløper {formatExpires(active.expiresAt)}</p>
+              <p className="text-xs text-muted-foreground">
+                {t("common.expires", { date: formatExpires(active.expiresAt, dateLocale) })}
+              </p>
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   disabled={inviteBusy}
-                  onClick={() => void handleGenerate("Ny kode er klar")}
+                  onClick={() => void handleGenerate(t("account.toastCodeReady"))}
                 >
-                  {generateInvite.isPending ? "Generer…" : "Erstatt kode"}
+                  {generateInvite.isPending ? t("account.inviteGenerating") : t("common.replace")}
                 </Button>
                 <Button
                   type="button"
@@ -177,24 +199,35 @@ export default function AccountRoute() {
                   disabled={inviteBusy}
                   onClick={() => setRevokeOpen(true)}
                 >
-                  Trekk tilbake
+                  {t("common.revoke")}
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="mt-4">
-              <p className="text-sm text-muted-foreground mb-3">Ingen aktiv kode akkurat nå.</p>
+            <div>
+              <p className="mb-3 text-sm text-muted-foreground">{t("account.noActiveCode")}</p>
               <Button
                 type="button"
                 disabled={inviteBusy}
-                onClick={() => void handleGenerate("Invitasjonskode opprettet")}
+                onClick={() => void handleGenerate(t("account.toastInviteCreated"))}
               >
-                {generateInvite.isPending ? "Genererer…" : "Generer kode"}
+                {generateInvite.isPending ? t("account.generating") : t("common.generate")}
               </Button>
             </div>
           )}
-        </div>
+        </SettingSection>
       ) : null}
+
+      <SettingSection title={t("account.preferencesSection")}>
+        <div className="space-y-6">
+          <LanguagePreferenceControl />
+          <ThemePreferenceControl />
+        </div>
+      </SettingSection>
+
+      <Button type="button" variant="outline" className="mx-auto flex w-full min-h-11 max-w-md" onClick={() => logout()}>
+        {t("common.logout")}
+      </Button>
 
       <Dialog
         open={revokeOpen}
@@ -205,10 +238,8 @@ export default function AccountRoute() {
       >
         <DialogContent showCloseButton>
           <DialogHeader>
-            <DialogTitle>Trekk tilbake invitasjon?</DialogTitle>
-            <DialogDescription>
-              Den nåværende koden slutter å virke umiddelbart. Du kan lage en ny senere.
-            </DialogDescription>
+            <DialogTitle>{t("account.revokeTitle")}</DialogTitle>
+            <DialogDescription>{t("account.revokeDescription")}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button
@@ -217,7 +248,7 @@ export default function AccountRoute() {
               disabled={revokeInvite.isPending}
               onClick={() => setRevokeOpen(false)}
             >
-              Avbryt
+              {t("common.cancel")}
             </Button>
             <Button
               type="button"
@@ -225,7 +256,7 @@ export default function AccountRoute() {
               disabled={revokeInvite.isPending}
               onClick={() => void handleRevoke()}
             >
-              {revokeInvite.isPending ? "Trekk tilbake…" : "Trekk tilbake"}
+              {revokeInvite.isPending ? t("account.inviteRevoking") : t("common.revoke")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight, ListChecks } from "lucide-react"
 import { Link } from "react-router"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { SwipeActionRow } from "~/components/SwipeActionRow"
@@ -30,10 +31,11 @@ import { ApiError } from "~/lib/api-fetch"
 import {
   addWeeksToMondayKey,
   expandWeekFromMonday,
-  formatWeekRangeTitleNb,
+  formatWeekRangeTitle,
   getMondayKeyContaining,
-  weekdayShortNb,
+  weekdayShort,
 } from "~/lib/dates"
+import { getDateLocaleTag } from "~/lib/i18n"
 import { cn } from "~/lib/utils"
 
 const EDIT_FORM_ID = "plan-edit-servings-form"
@@ -67,6 +69,10 @@ function formatIngredientLine(ing: PlannedMealIngredientDto): string {
 }
 
 export default function PlanRoute() {
+  const { t, i18n } = useTranslation()
+  const dateLoc = getDateLocaleTag(i18n.language)
+  const weekTitle = (mondayKey: string) => formatWeekRangeTitle(mondayKey, dateLoc)
+  const wdShort = (dayNumber: number) => weekdayShort(dayNumber, dateLoc)
   const [weekMonday, setWeekMonday] = useState(() => getMondayKeyContaining())
   const mealsQuery = usePlannedMeals(weekMonday)
   const categoriesQuery = useRecipeCategories()
@@ -280,28 +286,28 @@ export default function PlanRoute() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 id="plan-heading" className="font-heading text-xl font-semibold tracking-tight">
-              Ukeplan
+              {t("plan.title")}
             </h1>
-            <p className="mt-1 text-xs text-muted-foreground">Mandag {weekMonday}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t("plan.mondayLine", { date: weekMonday })}</p>
           </div>
           <div className="flex items-center gap-2">
             <Button
               type="button"
               size="icon"
               variant="outline"
-              aria-label="Previous week"
+              aria-label={t("plan.prevWeek")}
               onClick={() => setWeekMonday((k) => addWeeksToMondayKey(k, -1))}
             >
               <ChevronLeft className="size-5" aria-hidden />
             </Button>
             <p className="min-w-[10rem] flex-1 text-center text-sm font-medium tabular-nums">
-              {formatWeekRangeTitleNb(weekMonday)}
+              {weekTitle(weekMonday)}
             </p>
             <Button
               type="button"
               size="icon"
               variant="outline"
-              aria-label="Next week"
+              aria-label={t("plan.nextWeek")}
               onClick={() => setWeekMonday((k) => addWeeksToMondayKey(k, 1))}
             >
               <ChevronRight className="size-5" aria-hidden />
@@ -318,11 +324,9 @@ export default function PlanRoute() {
               aria-busy={generateShoppingSuggestions.isPending}
               onClick={() => void runGenerateShoppingSuggestions()}
             >
-              {generateShoppingSuggestions.isPending ? "Genererer…" : "Generer handleforslag"}
+              {generateShoppingSuggestions.isPending ? t("plan.generating") : t("plan.generateSuggestions")}
             </Button>
-            <span className="text-xs text-muted-foreground">
-              Les fra denne ukens plan (lagrer ikke i handleliste ennå).
-            </span>
+            <span className="text-xs text-muted-foreground">{t("plan.generateHint")}</span>
           </div>
         ) : null}
       </header>
@@ -330,18 +334,18 @@ export default function PlanRoute() {
       <div className="mt-6 space-y-4" aria-live="polite">
         {mealsQuery.isError ? (
           <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
-            <p className="text-sm font-medium text-foreground">Kunne ikke laste ukeplan.</p>
+            <p className="text-sm font-medium text-foreground">{t("plan.loadError")}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {mealsQuery.error instanceof Error ? mealsQuery.error.message : "Ukjent feil"}
+              {mealsQuery.error instanceof Error ? mealsQuery.error.message : t("common.unknownError")}
             </p>
             <Button type="button" size="sm" className="mt-3" onClick={() => void mealsQuery.refetch()}>
-              Prøv igjen
+              {t("common.retry")}
             </Button>
           </div>
         ) : null}
 
         {mealsQuery.isFetching && mealsQuery.data == null ? (
-          <ul className="space-y-3" aria-label="Laster ukeplan">
+          <ul className="space-y-3" aria-label={t("plan.loading")}>
             {[0, 1, 2, 3, 4].map((i) => (
               <li key={i} className="h-28 animate-pulse rounded-2xl border border-border bg-muted/80" />
             ))}
@@ -352,7 +356,7 @@ export default function PlanRoute() {
           <ul className="space-y-4">
             {weekDays.map((d) => {
               const dom = Number(d.dateKey.slice(8, 10))
-              const wd = weekdayShortNb(d.dayNumber)
+              const wd = wdShort(d.dayNumber)
               return (
                 <li key={d.dateKey}>
                   <article className="rounded-2xl border border-border bg-card p-3 shadow-sm">
@@ -362,7 +366,7 @@ export default function PlanRoute() {
                     <ul className="mt-3 space-y-2">
                       {planningCategories.map((mt) => {
                         const meal = mealForSlot(d.dayNumber, mt.id)
-                        const ariaEmpty = `Legg til ${mt.navn} på ${wd}`
+                        const ariaEmpty = t("plan.addSlotAria", { meal: mt.navn, day: wd })
                         if (!meal) {
                           return (
                             <li key={mt.id}>
@@ -380,7 +384,10 @@ export default function PlanRoute() {
                             </li>
                           )
                         }
-                        const ariaEdit = `Rediger ${meal.oppskriftNavn} porsjoner (${meal.mealType})`
+                        const ariaEdit = t("plan.editMealAria", {
+                          recipe: meal.oppskriftNavn,
+                          type: meal.mealType,
+                        })
                         return (
                           <li key={mt.id}>
                             <Button
@@ -392,7 +399,9 @@ export default function PlanRoute() {
                             >
                               <span className="text-xs text-muted-foreground">{meal.mealType}</span>
                               <span className="font-medium text-foreground">{meal.oppskriftNavn}</span>
-                              <span className="text-xs text-muted-foreground">{meal.servings} porsjoner</span>
+                              <span className="text-xs text-muted-foreground">
+                                {t("plan.servings", { n: meal.servings })}
+                              </span>
                             </Button>
                           </li>
                         )
@@ -407,9 +416,9 @@ export default function PlanRoute() {
 
         {!mealsQuery.isFetching && mealsQuery.data != null && mealsQuery.data.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Ingen måltider denne uken ennå. Legg til oppskrifter fra{" "}
+            {t("plan.emptyBefore")}{" "}
             <Link className="underline underline-offset-2" to="/app/chef">
-              kjøkkenet
+              {t("plan.emptyChef")}
             </Link>
             .
           </p>
@@ -422,10 +431,10 @@ export default function PlanRoute() {
           if (!open) setEditingMeal(null)
         }}
         labelledById={editTitleId}
-        title={editingMeal ? editingMeal.oppskriftNavn : "Rediger måltid"}
+        title={editingMeal ? editingMeal.oppskriftNavn : t("plan.editMeal")}
         description={
           editingMeal
-            ? `${weekdayShortNb(editingMeal.day)} · ${editingMeal.mealType}`
+            ? `${wdShort(editingMeal.day)} · ${editingMeal.mealType}`
             : undefined
         }
         footer={
@@ -515,7 +524,7 @@ export default function PlanRoute() {
                 </p>
               ) : null}
               <button type="submit" className="sr-only" tabIndex={-1}>
-                Lagre porsjoner
+                {t("plan.saveServings")}
               </button>
             </form>
 
@@ -594,7 +603,7 @@ export default function PlanRoute() {
             <p className="text-sm text-foreground">
               Er du sikker på at du vil fjerne{" "}
               <span className="font-semibold">{editingMeal.oppskriftNavn}</span> fra{" "}
-              <span className="font-medium">{formatWeekRangeTitleNb(editingMeal.weekStartDate)}</span>? Dette påvirker
+              <span className="font-medium">{weekTitle(editingMeal.weekStartDate)}</span>? Dette påvirker
               alle i husholdningen.
             </p>
             <p className="text-xs text-muted-foreground">
@@ -622,7 +631,7 @@ export default function PlanRoute() {
         title="Gjennomgå handleforslag"
         description={
           suggestionReview
-            ? `${formatWeekRangeTitleNb(suggestionReview.weekStartDate)} · ${suggestionReview.plannedMealCount} planlagte måltid${suggestionReview.plannedMealCount === 1 ? "" : "er"} · ${suggestionReview.suggestions.length} rader`
+            ? `${weekTitle(suggestionReview.weekStartDate)} · ${suggestionReview.plannedMealCount} planlagte måltid${suggestionReview.plannedMealCount === 1 ? "" : "er"} · ${suggestionReview.suggestions.length} rader`
             : undefined
         }
         footer={

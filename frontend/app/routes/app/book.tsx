@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react"
 import { Link } from "react-router"
 import { CalendarClock, Search, ShoppingBasket, Star } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { DetailSheet } from "~/components/detail-sheet"
@@ -9,6 +10,7 @@ import { Button, buttonVariants } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
 import { Label } from "~/components/ui/label"
 import type { CookbookHistoryItem, CookbookSortMode } from "~/features/cookbook/types"
+import { backendKarakterToStars, useSaveCookbookRating } from "~/features/cookbook/use-save-cookbook-rating"
 import { useCookbookHistory, type CookbookHistoryFilters } from "~/features/cookbook/use-cookbook-history"
 import { useHousehold } from "~/features/household/use-household"
 import { AddToPlanPanel } from "~/features/planning/add-to-plan-panel"
@@ -20,17 +22,77 @@ import {
 } from "~/features/planning/constants"
 import { useCreatePlannedMeal } from "~/features/planning/use-planned-meals"
 import { useDebouncedValue, useRecipeCategories } from "~/features/recipes/use-recipes"
+import { ApiError } from "~/lib/api-fetch"
+import { getDateLocaleTag } from "~/lib/i18n"
 
 const BOOK_SEARCH_ID = "book-cookbook-search"
 const BOOK_PLAN_FORM_ID = "book-add-plan-form"
 
-function formatLastCookedNb(iso: string): string {
+function formatCookbookDate(iso: string, localeTag: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
-  return new Intl.DateTimeFormat("nb-NO", { dateStyle: "medium" }).format(d)
+  return new Intl.DateTimeFormat(localeTag, { dateStyle: "medium" }).format(d)
+}
+
+const RATING_STEPS = [1, 2, 3, 4, 5] as const
+
+function CookbookRowRating({
+  row,
+}: {
+  row: CookbookHistoryItem
+}) {
+  const { t } = useTranslation()
+  const saveRating = useSaveCookbookRating()
+  const stars = backendKarakterToStars(row.currentUserRating)
+  const summaryId = `book-rating-summary-${row.recipeId}-${row.mealTypeId}`
+
+  return (
+    <fieldset className="min-w-0 space-y-2 border-0 p-0">
+      <legend className="sr-only">{t("book.ratingLegend", { recipe: row.recipeName })}</legend>
+      <p id={summaryId} className="text-sm text-muted-foreground">
+        {stars != null ? (
+          <span className="font-medium text-foreground">{t("book.ratingLine", { n: stars })}</span>
+        ) : (
+          <span className="text-foreground">{t("book.notRated")}</span>
+        )}
+      </p>
+      <div className="flex flex-wrap gap-1.5" aria-describedby={summaryId}>
+        {RATING_STEPS.map((step) => {
+          const selected = stars === step
+          return (
+            <Button
+              key={step}
+              type="button"
+              size="sm"
+              variant={selected ? "secondary" : "outline"}
+              className="h-9 min-w-9 gap-1 px-2 sm:h-8 sm:min-w-8"
+              disabled={saveRating.isPending}
+              aria-pressed={selected}
+              aria-label={t("book.rateAria", { recipe: row.recipeName, step })}
+              onClick={() =>
+                saveRating.mutate(
+                  { recipeId: row.recipeId, stars: step },
+                  {
+                    onSuccess: () => toast.success(t("book.ratingSaved")),
+                    onError: (err) =>
+                      toast.error(err instanceof ApiError ? err.message : t("book.ratingError")),
+                  },
+                )
+              }
+            >
+              <Star className="size-3.5 shrink-0" aria-hidden fill={selected ? "currentColor" : "none"} />
+              <span className="tabular-nums">{step}</span>
+            </Button>
+          )
+        })}
+      </div>
+    </fieldset>
+  )
 }
 
 export default function BookRoute() {
+  const { t, i18n } = useTranslation()
+  const dateLoc = getDateLocaleTag(i18n.language)
   const [search, setSearch] = useState("")
   const debouncedSearch = useDebouncedValue(search, 300)
   const trimmed = debouncedSearch.trim()
@@ -86,23 +148,24 @@ export default function BookRoute() {
 
   const sheetDescription =
     selectedItem != null
-      ? `${selectedItem.mealType} · ${selectedItem.cookedCount} gang(er) registrert`
+      ? t("book.sheetMeta", {
+          mealType: selectedItem.mealType,
+          count: selectedItem.cookedCount,
+        })
       : undefined
 
   return (
     <section className="p-4" aria-labelledby="book-heading">
       <div className="space-y-1">
         <h1 id="book-heading" className="font-heading text-xl font-semibold tracking-tight">
-          Kokebok
+          {t("book.title")}
         </h1>
-        <p className="text-sm text-muted-foreground">
-          Måltider husstanden har laget etter fullførte handleturer.
-        </p>
+        <p className="text-sm text-muted-foreground">{t("book.subtitle")}</p>
       </div>
 
       <div className="mt-5 space-y-3">
         <Label htmlFor={BOOK_SEARCH_ID} className="text-foreground">
-          Søk
+          {t("book.searchLabel")}
         </Label>
         <div className="relative">
           <Search
@@ -113,7 +176,7 @@ export default function BookRoute() {
             id={BOOK_SEARCH_ID}
             type="search"
             autoComplete="off"
-            placeholder="Oppskrift eller måltidstype"
+            placeholder={t("book.searchPlaceholder")}
             className="pl-10"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -125,7 +188,7 @@ export default function BookRoute() {
         <div
           className="flex min-w-0 flex-wrap gap-1.5"
           role="group"
-          aria-label="Filtrer etter måltidstype"
+          aria-label={t("book.filterMealType")}
         >
           <Button
             type="button"
@@ -135,10 +198,10 @@ export default function BookRoute() {
             aria-pressed={mealTypeId == null}
             onClick={() => setMealTypeId(null)}
           >
-            Alle
+            {t("book.all")}
           </Button>
           {categoriesQuery.isLoading ? (
-            <span className="text-xs text-muted-foreground">Laster…</span>
+            <span className="text-xs text-muted-foreground">{t("common.loading")}</span>
           ) : null}
           {planningMealCategories.map((c) => {
             const selected = mealTypeId === c.id
@@ -162,7 +225,7 @@ export default function BookRoute() {
         <div
           className="flex shrink-0 gap-1 rounded-xl border border-border p-1"
           role="group"
-          aria-label="Sortering"
+          aria-label={t("book.sortAria")}
         >
           <Button
             type="button"
@@ -172,7 +235,7 @@ export default function BookRoute() {
             aria-pressed={sort === "ratingThenRecent"}
             onClick={() => setSort("ratingThenRecent")}
           >
-            Anbefalt
+            {t("book.sortRating")}
           </Button>
           <Button
             type="button"
@@ -182,7 +245,7 @@ export default function BookRoute() {
             aria-pressed={sort === "recent"}
             onClick={() => setSort("recent")}
           >
-            Nyeste
+            {t("book.sortRecent")}
           </Button>
         </div>
       </div>
@@ -190,9 +253,9 @@ export default function BookRoute() {
       <div className="mt-6 space-y-3" aria-live="polite">
         {cookbookQuery.isError ? (
           <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
-            <p className="text-sm font-medium text-foreground">Kunne ikke laste kokeboken.</p>
+            <p className="text-sm font-medium text-foreground">{t("book.loadError")}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {cookbookQuery.error instanceof Error ? cookbookQuery.error.message : "Ukjent feil"}
+              {cookbookQuery.error instanceof Error ? cookbookQuery.error.message : t("common.unknownError")}
             </p>
             <Button
               type="button"
@@ -200,13 +263,13 @@ export default function BookRoute() {
               className="mt-3"
               onClick={() => void cookbookQuery.refetch()}
             >
-              Prøv igjen
+              {t("common.retry")}
             </Button>
           </div>
         ) : null}
 
         {cookbookQuery.isFetching && items == null ? (
-          <ul className="space-y-3" aria-label="Laster kokebok">
+          <ul className="space-y-3" aria-label={t("book.loadingCookbook")}>
             {[0, 1, 2].map((i) => (
               <li
                 key={i}
@@ -220,16 +283,13 @@ export default function BookRoute() {
           <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-6">
             <div className="flex flex-col items-center text-center">
               <ShoppingBasket className="size-10 text-muted-foreground" aria-hidden />
-              <p className="mt-4 text-sm font-medium text-foreground">Ingen måltider i kokeboken ennå</p>
-              <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-                Fullfør en handletur med oppskriftsvarer fra ukeplanen. Da dukker måltidene opp her så
-                dere kan lage dem igjen.
-              </p>
+              <p className="mt-4 text-sm font-medium text-foreground">{t("book.emptyTitle")}</p>
+              <p className="mt-2 max-w-sm text-sm text-muted-foreground">{t("book.emptyHint")}</p>
               <Link
                 to="/app/shop"
                 className={cn(buttonVariants({ variant: "default" }), "mt-5 inline-flex w-full max-w-xs justify-center no-underline")}
               >
-                Gå til handleliste
+                {t("book.emptyCta")}
               </Link>
               <Link
                 to="/app/plan"
@@ -238,7 +298,7 @@ export default function BookRoute() {
                   "mt-2 inline-flex w-full max-w-xs justify-center no-underline",
                 )}
               >
-                Åpne ukeplan
+                {t("shop.emptyGotoPlan")}
               </Link>
             </div>
           </div>
@@ -246,12 +306,10 @@ export default function BookRoute() {
 
         {noResults ? (
           <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center">
-            <p className="text-sm font-medium text-foreground">Ingen treff</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Prøv et annet søk eller fjern måltidsfilteret.
-            </p>
+            <p className="text-sm font-medium text-foreground">{t("book.noHits")}</p>
+            <p className="mt-2 text-sm text-muted-foreground">{t("book.noHitsHint")}</p>
             <Button type="button" className="mt-4" variant="secondary" onClick={clearFilters}>
-              Nullstill søk og filter
+              {t("book.clearFilters")}
             </Button>
           </div>
         ) : null}
@@ -272,32 +330,18 @@ export default function BookRoute() {
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5">
                         <CalendarClock className="size-3.5 shrink-0" aria-hidden />
-                        <span>Sist laget {formatLastCookedNb(row.lastCookedAt)}</span>
+                        <span>
+                          {t("book.lastCooked", {
+                            date: formatCookbookDate(row.lastCookedAt, dateLoc),
+                          })}
+                        </span>
                       </span>
-                      <span aria-label={`Lagt ${row.cookedCount} gang(er)`}>
-                        · {row.cookedCount}× laget
+                      <span aria-label={t("book.cookedAria", { count: row.cookedCount })}>
+                        · {t("book.cookedLabel", { count: row.cookedCount })}
                       </span>
                     </div>
 
-                    <div className="flex items-start gap-2 text-sm">
-                      <Star
-                        className="mt-0.5 size-4 shrink-0 text-foreground"
-                        aria-hidden
-                        strokeWidth={2}
-                      />
-                      <span className="text-muted-foreground">
-                        {row.currentUserRating != null ? (
-                          <>
-                            <span className="sr-only">Din vurdering:</span>
-                            <span aria-hidden>Din vurdering: </span>
-                            <span className="font-medium text-foreground">{row.currentUserRating}</span>
-                            <span className="text-muted-foreground"> av 10</span>
-                          </>
-                        ) : (
-                          <span className="text-foreground">Ikke vurdert ennå</span>
-                        )}
-                      </span>
-                    </div>
+                    <CookbookRowRating row={row} />
 
                     <Button
                       type="button"
@@ -305,7 +349,7 @@ export default function BookRoute() {
                       className="w-full sm:w-auto"
                       onClick={(e) => openPlanSheet(row, e.currentTarget)}
                     >
-                      Planlegg på nytt
+                      {t("book.planAgain")}
                     </Button>
                   </div>
                 </article>
@@ -322,7 +366,7 @@ export default function BookRoute() {
           if (!open) setSelectedItem(null)
         }}
         labelledById="book-add-plan-sheet-title"
-        title={selectedItem?.recipeName ?? "Legg i plan"}
+        title={selectedItem?.recipeName ?? t("book.addToPlan")}
         description={sheetDescription}
         returnFocusRef={returnFocusRef}
         footer={
@@ -361,7 +405,7 @@ export default function BookRoute() {
             mealCategories={planningMealCategories}
             createMutation={createPlannedMealMutation}
             onSaved={() => {
-              toast.success("Lagret i ukeplan.")
+              toast.success(t("book.planSavedToast"))
               setSheetOpen(false)
               setSelectedItem(null)
             }}

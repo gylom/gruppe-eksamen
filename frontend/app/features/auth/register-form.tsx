@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
+import { useTranslation } from "react-i18next"
 import { useNavigate, Link } from "react-router"
 import { z } from "zod"
 
@@ -13,14 +14,12 @@ import { queryClient } from "~/lib/query-client"
 
 import type { AuthResponse, MeResponse } from "./types"
 
-const schema = z.object({
-  brukernavn: z.string().min(2, "Minst 2 tegn"),
-  email: z.string().email("Ugyldig e-postadresse"),
-  passord: z.string().min(8, "Minst 8 tegn"),
-  fullName: z.string().optional(),
-})
-
-type RegisterValues = z.infer<typeof schema>
+type RegisterValues = {
+  brukernavn: string
+  email: string
+  passord: string
+  fullName?: string
+}
 
 function deriveMeFromAuthResponse(auth: AuthResponse): MeResponse {
   return {
@@ -35,7 +34,20 @@ function deriveMeFromAuthResponse(auth: AuthResponse): MeResponse {
 
 export function RegisterForm() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [topError, setTopError] = useState<string | null>(null)
+
+  const schema = useMemo(
+    () =>
+      z.object({
+        brukernavn: z.string().min(2, t("validation.minUsername")),
+        email: z.string().email(t("validation.email")),
+        passord: z.string().min(8, t("validation.minPassword")),
+        fullName: z.string().optional(),
+      }),
+    [t]
+  )
+
   const {
     register,
     handleSubmit,
@@ -67,14 +79,14 @@ export function RegisterForm() {
           setTopError(msg)
         }
       } else {
-        setTopError("Noe gikk galt. Prøv igjen.")
+        setTopError(t("common.genericError"))
       }
     }
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
-      <h1 className="text-2xl font-semibold">Registrer</h1>
+      <h1 className="text-2xl font-semibold">{t("auth.registerTitle")}</h1>
 
       {topError && (
         <p role="alert" className="text-sm text-destructive">
@@ -83,7 +95,7 @@ export function RegisterForm() {
       )}
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="brukernavn">Brukernavn</Label>
+        <Label htmlFor="brukernavn">{t("auth.username")}</Label>
         <Input
           id="brukernavn"
           type="text"
@@ -96,7 +108,7 @@ export function RegisterForm() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="email">E-post</Label>
+        <Label htmlFor="email">{t("auth.email")}</Label>
         <Input
           id="email"
           type="email"
@@ -109,7 +121,7 @@ export function RegisterForm() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="passord">Passord</Label>
+        <Label htmlFor="passord">{t("auth.password")}</Label>
         <Input
           id="passord"
           type="password"
@@ -122,7 +134,7 @@ export function RegisterForm() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="fullName">Fullt navn (valgfritt)</Label>
+        <Label htmlFor="fullName">{t("auth.fullNameOptional")}</Label>
         <Input
           id="fullName"
           type="text"
@@ -134,13 +146,13 @@ export function RegisterForm() {
       </div>
 
       <Button type="submit" disabled={isSubmitting}>
-        {isSubmitting ? "Registrerer…" : "Registrer"}
+        {isSubmitting ? t("auth.registering") : t("auth.registerCta")}
       </Button>
 
       <p className="text-sm text-muted-foreground">
-        Har du allerede en konto?{" "}
+        {t("auth.haveAccount")}{" "}
         <Link to="/login" className="underline">
-          Logg inn
+          {t("auth.loginLink")}
         </Link>
       </p>
     </form>

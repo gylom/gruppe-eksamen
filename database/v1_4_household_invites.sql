@@ -22,9 +22,9 @@ CREATE TABLE HusholdningInvitasjon (
 -- A user can only belong to ONE household. The legacy composite UNIQUE
 -- (husholdning_id, user_id) allowed the same user to be a member of multiple
 -- households, which contradicts the single-membership invariant the controller
--- enforces. Replace it with a unique index on user_id alone so concurrent join
--- attempts cannot insert duplicate Medlem rows.
-ALTER TABLE Medlemmer DROP INDEX husholdning_id;
+-- enforces. Keep the legacy composite index because it also supports the
+-- husholdning_id foreign key, and add a dedicated unique index on user_id so
+-- concurrent join attempts cannot insert duplicate Medlem rows.
 ALTER TABLE Medlemmer ADD UNIQUE KEY uk_medlemmer_user_id (user_id);
 
 -- Cap household name length to match the API validation.

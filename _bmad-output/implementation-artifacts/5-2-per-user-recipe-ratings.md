@@ -1,6 +1,6 @@
 # Story 5.2: Per-User Recipe Ratings
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -75,6 +75,10 @@ so that my cookbook view reflects my preferences without changing other members'
   - [ ] Manual/API smoke: log in as user B in the same household, rate the same recipe differently, and confirm user A's rating is unchanged.
   - [ ] Manual UI smoke at 360px and desktop-centered width: rating buttons, text state, toast, loading/disabled state, and plan-again action do not overlap.
   - [ ] Manual accessibility smoke: keyboard through all five rating options, confirm visible focus, and confirm the rating is understandable without color or star fill alone.
+
+### Review Findings
+
+- [x] [Review][Patch] Shared mutation state can re-enable a still-pending row save [frontend/app/routes/app/book.tsx:45]
 
 ## Dev Notes
 
@@ -227,10 +231,20 @@ Ultimate context engine analysis completed - comprehensive developer guide creat
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Composer (agentic)
 
 ### Debug Log References
 
 ### Completion Notes List
 
+- Reused `PUT /api/oppskrifter/{id}/preferanse` with `{ karakter: 2|4|6|8|10, skjul: false }` (no backend changes).
+- Added `use-save-cookbook-rating.ts` with TanStack Query mutation; `onSuccess` awaits `invalidateQueries` for `["cookbook"]`, `["recipe", id]`, and `["recipes"]`.
+- Book route: per-row accessible fieldset + text state (`Din vurdering: N av 5` / `Ikke vurdert ennå`), five `aria-pressed` buttons with recipe-scoped labels, row-scoped `disabled` while pending, Sonner toasts for success/error (`ApiError.message` when available).
+- Verified: `npm run typecheck --prefix frontend` and root `npm run build` pass.
+
 ### File List
+
+- `frontend/app/features/cookbook/use-save-cookbook-rating.ts` (new)
+- `frontend/app/routes/app/book.tsx`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/5-2-per-user-recipe-ratings.md`

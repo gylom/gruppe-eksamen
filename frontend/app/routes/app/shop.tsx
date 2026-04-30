@@ -1,5 +1,7 @@
 import { useRef, useState } from "react"
 import type { Dispatch, SetStateAction } from "react"
+import type { TFunction } from "i18next"
+import { useTranslation } from "react-i18next"
 import { Link } from "react-router"
 import { Pencil, Plus } from "lucide-react"
 import { toast } from "sonner"
@@ -21,6 +23,7 @@ import { useUpdateShoppingItem } from "~/features/shopping/use-update-shopping-i
 import { useVaretyperLookup } from "~/features/shopping/use-varetyper-lookup"
 import type { ActiveShoppingListRow } from "~/features/shopping/types"
 import { ApiError } from "~/lib/api-fetch"
+import { getDateLocaleTag } from "~/lib/i18n"
 import { cn } from "~/lib/utils"
 
 const SHOP_ITEM_SHEET_TITLE_ID = "shop-item-sheet-title"
@@ -32,13 +35,13 @@ const selectStyles = cn(
   "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
 )
 
-function sourceKindLabel(kilde: string): string {
-  if (kilde === "plannedMeal") return "Fra planen"
-  return "Manuelt"
+function sourceKindLabel(kilde: string, t: TFunction): string {
+  if (kilde === "plannedMeal") return t("shop.fromPlan")
+  return t("shop.manual")
 }
 
-function formatQuantityLine(row: ActiveShoppingListRow): string {
-  if (row.kvantitet == null) return "Ingen mengde"
+function formatQuantityLine(row: ActiveShoppingListRow, t: TFunction): string {
+  if (row.kvantitet == null) return t("shop.noAmount")
   const u = row.maaleenhet?.trim() ? ` ${row.maaleenhet}` : ""
   return `${row.kvantitet}${u}`
 }
@@ -49,16 +52,18 @@ function itemDisplayName(row: ActiveShoppingListRow): string {
   return row.varetype
 }
 
-function formatPurchasedAt(iso: string | null): string {
+function formatPurchasedAt(iso: string | null, localeTag: string): string {
   if (!iso) return ""
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ""
-  return d.toLocaleString("nb-NO", { dateStyle: "short", timeStyle: "short" })
+  return d.toLocaleString(localeTag, { dateStyle: "short", timeStyle: "short" })
 }
 
 type ShopListView = "active" | "purchased"
 
 export default function ShopRoute() {
+  const { t, i18n } = useTranslation()
+  const dateLoc = getDateLocaleTag(i18n.language)
   const [listView, setListView] = useState<ShopListView>("active")
   const listQuery = useShoppingList()
   const purchasedQuery = usePurchasedShoppingList(true)
@@ -258,11 +263,9 @@ export default function ShopRoute() {
       <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight">Handleliste</h1>
+            <h1 className="text-xl font-semibold tracking-tight">{t("shop.title")}</h1>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {listView === "active"
-                ? "Aktive varer i husholdningen"
-                : "Varer du har krysset av — gjenopprett ved feil"}
+              {listView === "active" ? t("shop.subtitleActive") : t("shop.subtitlePurchased")}
             </p>
           </div>
           {listView === "active" ? (
@@ -274,7 +277,7 @@ export default function ShopRoute() {
               onClick={() => openAdd(addButtonRef.current ?? undefined)}
             >
               <Plus className="size-4" aria-hidden />
-              Legg til
+              {t("shop.addShort")}
             </Button>
           ) : (
             <span className="shrink-0" aria-hidden />
@@ -282,7 +285,7 @@ export default function ShopRoute() {
         </div>
         <div
           role="tablist"
-          aria-label="Handlelistevisning"
+          aria-label={t("shop.viewToggle")}
           className="mt-3 flex gap-1 rounded-xl border border-border bg-muted/30 p-1"
         >
           <button
@@ -297,7 +300,7 @@ export default function ShopRoute() {
             )}
             onClick={() => setListView("active")}
           >
-            Aktive
+            {t("shop.tabActive")}
           </button>
           <button
             type="button"
@@ -311,7 +314,7 @@ export default function ShopRoute() {
             )}
             onClick={() => setListView("purchased")}
           >
-            Kjøpte
+            {t("shop.tabPurchased")}
           </button>
         </div>
         {showCompleteTrip ? (
@@ -325,7 +328,7 @@ export default function ShopRoute() {
               disabled={purchasedCount === 0}
               onClick={() => setCompleteSheetOpen(true)}
             >
-              Fullfør handletur
+              {t("shop.completeTripCta")}
             </Button>
           </div>
         ) : null}
@@ -338,10 +341,8 @@ export default function ShopRoute() {
             aria-live="polite"
           >
             <div>
-              <h2 className="text-base font-medium">Kunne ikke laste handlelisten</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Sjekk nettverket og prøv på nytt.
-              </p>
+              <h2 className="text-base font-medium">{t("shop.loadError")}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{t("shop.loadErrorHint")}</p>
             </div>
             <Button
               type="button"
@@ -350,7 +351,7 @@ export default function ShopRoute() {
               disabled={listQuery.isFetching}
               onClick={() => void listQuery.refetch()}
             >
-              Prøv igjen
+              {t("common.retry")}
             </Button>
           </section>
         ) : null}
@@ -415,14 +416,14 @@ export default function ShopRoute() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                           <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
-                            {formatQuantityLine(row)}
+                            {formatQuantityLine(row, t)}
                           </span>
                           <span className="min-w-0 break-words text-sm font-medium leading-snug">
                             {name}
                           </span>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          <span className="font-medium text-foreground/80">{sourceKindLabel(row.kilde)}</span>
+                          <span className="font-medium text-foreground/80">{sourceKindLabel(row.kilde, t)}</span>
                           <span aria-hidden> · </span>
                           <span>{row.brukernavn}</span>
                         </p>
@@ -494,7 +495,7 @@ export default function ShopRoute() {
             {purchasedList.map((row) => {
               const name = itemDisplayName(row)
               const rowRestorePending = pendingRestoreIds.has(row.id)
-              const boughtLine = formatPurchasedAt(row.purchasedAt)
+              const boughtLine = formatPurchasedAt(row.purchasedAt, dateLoc)
               return (
                 <li
                   key={row.id}
@@ -510,12 +511,12 @@ export default function ShopRoute() {
                     <div className="min-w-0 pr-1">
                       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                         <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
-                          {formatQuantityLine(row)}
+                          {formatQuantityLine(row, t)}
                         </span>
                         <span className="min-w-0 break-words text-sm font-medium leading-snug">{name}</span>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground/80">{sourceKindLabel(row.kilde)}</span>
+                        <span className="font-medium text-foreground/80">{sourceKindLabel(row.kilde, t)}</span>
                         <span aria-hidden> · </span>
                         <span>{row.brukernavn}</span>
                       </p>

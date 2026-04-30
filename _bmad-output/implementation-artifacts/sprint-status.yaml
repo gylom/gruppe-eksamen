@@ -1,5 +1,5 @@
 # generated: 2026-04-30
-# last_updated: 2026-04-30 (story 5.2 ready-for-dev)
+# last_updated: 2026-05-01 (story 6.2 ready for dev)
 # project: gruppe-eksamen
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-30
-last_updated: 2026-04-30 (story 5.2 ready-for-dev)
+last_updated: 2026-05-01 (story 6.2 ready for dev)
 project: gruppe-eksamen
 project_key: NOKEY
 tracking_system: file-system
@@ -66,13 +66,13 @@ development_status:
   4-3-purchase-completion-and-archiving: done
   epic-4-retrospective: optional
 
-  epic-5: in-progress
+  epic-5: done
   5-1-cookbook-history-search-sorting-and-re-planning: done
-  5-2-per-user-recipe-ratings: ready-for-dev
+  5-2-per-user-recipe-ratings: done
   epic-5-retrospective: optional
 
-  epic-6: backlog
-  6-1-account-preferences-theme-and-language: backlog
-  6-2-core-empty-error-loading-responsive-and-accessibility-polish: backlog
+  epic-6: in-progress
+  6-1-account-preferences-theme-and-language: done
+  6-2-core-empty-error-loading-responsive-and-accessibility-polish: ready-for-dev
   6-3-exam-demo-path-reliability: backlog
   epic-6-retrospective: optional

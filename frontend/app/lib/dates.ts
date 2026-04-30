@@ -72,13 +72,24 @@ export function defaultDayNumberForWeek(mondayKey: string, ref: Date = new Date(
 }
 
 export function formatWeekRangeTitleNb(mondayKey: string): string {
+  return formatWeekRangeTitle(mondayKey, "nb-NO")
+}
+
+export function formatWeekRangeTitle(mondayKey: string, localeTag: string): string {
   const start = localDateFromKey(mondayKey)
   const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6)
-  const fmt = new Intl.DateTimeFormat("nb-NO", { day: "numeric", month: "short" })
+  const fmt = new Intl.DateTimeFormat(localeTag, { day: "numeric", month: "short" })
   return `${fmt.format(start)}–${fmt.format(end)}`
 }
 
+const WEEKDAY_SHORT_NB = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"]
+const WEEKDAY_SHORT_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
 export function weekdayShortNb(dayNumber: number): string {
-  const labels = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"]
+  return weekdayShort(dayNumber, "nb-NO")
+}
+
+export function weekdayShort(dayNumber: number, localeTag: string): string {
+  const labels = localeTag.startsWith("en") ? WEEKDAY_SHORT_EN : WEEKDAY_SHORT_NB
   return labels[dayNumber - 1] ?? ""
 }

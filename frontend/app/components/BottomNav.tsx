@@ -1,24 +1,27 @@
 import { BookOpen, CalendarDays, ChefHat, ShoppingBasket, User } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { NavLink } from "react-router"
 
 import { cn } from "~/lib/utils"
 
-const navItems = [
-  { to: "/app/chef", label: "Kjøkken", Icon: ChefHat },
-  { to: "/app/plan", label: "Plan", Icon: CalendarDays },
-  { to: "/app/shop", label: "Handel", Icon: ShoppingBasket },
-  { to: "/app/book", label: "Bok", Icon: BookOpen },
-  { to: "/app/account", label: "Konto", Icon: User },
+const navPaths = [
+  { to: "/app/chef", key: "chef" as const, Icon: ChefHat },
+  { to: "/app/plan", key: "plan" as const, Icon: CalendarDays },
+  { to: "/app/shop", key: "shop" as const, Icon: ShoppingBasket },
+  { to: "/app/book", key: "book" as const, Icon: BookOpen },
+  { to: "/app/account", key: "account" as const, Icon: User },
 ]
 
 export function BottomNav() {
+  const { t } = useTranslation()
+
   return (
     <nav
-      aria-label="Hovednavigasjon"
-      className="sticky bottom-0 shrink-0 border-t border-border bg-background/95 px-2 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-10px_30px_rgba(15,23,42,0.06)] backdrop-blur"
+      aria-label={t("nav.main")}
+      className="sticky bottom-0 shrink-0 border-t border-border bg-background/95 px-2 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-10px_30px_rgba(15,23,42,0.06)] backdrop-blur dark:shadow-[0_-10px_30px_rgba(0,0,0,0.35)]"
     >
       <div className="grid h-16 grid-cols-5">
-        {navItems.map(({ to, label, Icon }) => (
+        {navPaths.map(({ to, key, Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -39,7 +42,7 @@ export function BottomNav() {
                   )}
                 />
                 <Icon className="size-6" strokeWidth={isActive ? 2.5 : 2} aria-hidden="true" />
-                <span className="leading-none">{label}</span>
+                <span className="leading-tight text-center">{t(`nav.${key}`)}</span>
               </>
             )}
           </NavLink>
