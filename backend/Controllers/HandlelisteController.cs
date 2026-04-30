@@ -93,6 +93,122 @@ public class HandlelisteController : ControllerBase
         return Ok(new ShoppingListGetResponse { Varer = items, Forslag = forslag });
     }
 
+    [HttpGet("purchased")]
+    public async Task<IActionResult> GetPurchased()
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var memberIds = await GetHouseholdMemberIds(userId.Value);
+        if (memberIds.Count == 0)
+            return Ok(new ShoppingListPurchasedResponse());
+
+        var items = await _db.Handleliste
+            .Where(x => memberIds.Contains(x.UserId) && x.PurchasedAt != null)
+            .Include(x => x.Varetype)
+            .Include(x => x.Vare)
+            .Include(x => x.Maaleenhet)
+            .Include(x => x.Bruker)
+            .OrderByDescending(x => x.PurchasedAt)
+            .ThenByDescending(x => x.Endret ?? x.Opprettet)
+            .Select(x => new ActiveShoppingListRowDto
+            {
+                Id = x.Id,
+                VaretypeId = x.VaretypeId,
+                Varetype = x.Varetype!.Navn,
+                VareId = x.VareId,
+                Varenavn = x.Vare != null ? x.Vare.Varenavn : null,
+                Kvantitet = x.Kvantitet,
+                MaaleenhetId = x.MaaleenhetId,
+                Maaleenhet = x.Maaleenhet != null ? x.Maaleenhet.Enhet : null,
+                UserId = x.UserId,
+                Brukernavn = x.Bruker!.Brukernavn,
+                Kilde = x.Kilde,
+                PlanlagtMaaltidId = x.PlanlagtMaaltidId,
+                PurchasedAt = x.PurchasedAt,
+                Opprettet = x.Opprettet,
+                Endret = x.Endret,
+            })
+            .ToListAsync();
+
+        return Ok(new ShoppingListPurchasedResponse { Varer = items });
+    }
+
+    [HttpPost("{id:long}/purchase")]
+    public async Task<IActionResult> Purchase(long id)
+    {
+        if (id < 1) return BadRequest(new { message = "Ugyldig id." });
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var memberIds = await GetHouseholdMemberIds(userId.Value);
+        var row = await _db.Handleliste.FirstOrDefaultAsync(x => x.Id == (ulong)id && memberIds.Contains(x.UserId));
+        if (row == null) return NotFound(new { message = "Handleliste-rad ikke funnet." });
+
+        if (row.PurchasedAt != null)
+        {
+            return Ok(new ShoppingListPurchaseRestoreResponse
+            {
+                Message = "Handleliste oppdatert.",
+                Id = row.Id,
+                PurchasedAt = row.PurchasedAt,
+            });
+        }
+
+        row.PurchasedAt = DateTime.UtcNow;
+        row.Endret = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        return Ok(new ShoppingListPurchaseRestoreResponse
+        {
+            Message = "Handleliste oppdatert.",
+            Id = row.Id,
+            PurchasedAt = row.PurchasedAt,
+        });
+    }
+
+    [HttpPost("{id:long}/restore")]
+    public async Task<IActionResult> Restore(long id)
+    {
+        if (id < 1) return BadRequest(new { message = "Ugyldig id." });
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var memberIds = await GetHouseholdMemberIds(userId.Value);
+        var row = await _db.Handleliste.FirstOrDefaultAsync(x => x.Id == (ulong)id && memberIds.Contains(x.UserId));
+        if (row == null) return NotFound(new { message = "Handleliste-rad ikke funnet." });
+
+        if (row.PurchasedAt == null)
+        {
+            return Ok(new ShoppingListPurchaseRestoreResponse
+            {
+                Message = "Handleliste oppdatert.",
+                Id = row.Id,
+                PurchasedAt = null,
+            });
+        }
+
+        var activeDuplicate = await _db.Handleliste.AnyAsync(x =>
+            memberIds.Contains(x.UserId) &&
+            x.Id != row.Id &&
+            x.VaretypeId == row.VaretypeId &&
+            x.MaaleenhetId == row.MaaleenhetId &&
+            x.PurchasedAt == null);
+        if (activeDuplicate)
+            return Conflict(new { message = "Denne varen er allerede på handlelisten." });
+
+        row.PurchasedAt = null;
+        row.Endret = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        return Ok(new ShoppingListPurchaseRestoreResponse
+        {
+            Message = "Handleliste oppdatert.",
+            Id = row.Id,
+            PurchasedAt = null,
+        });
+    }
+
     /// <summary>
     /// Read-only: aggregate planned-meal ingredients for a week. Does not insert handleliste rows.
     /// Suggestions are sorted by ingredient name, unit label, varetype id, maaleenhet id (deterministic).
@@ -373,8 +489,7 @@ public class HandlelisteController : ControllerBase
         var duplicate = await _db.Handleliste.AnyAsync(x =>
             memberIds.Contains(x.UserId) &&
             x.VaretypeId == request.VaretypeId &&
-            x.MaaleenhetId == request.MaaleenhetId &&
-            x.PurchasedAt == null);
+            x.MaaleenhetId == request.MaaleenhetId);
         if (duplicate)
             return Conflict(new { message = "Denne varen er allerede på handlelisten." });
 

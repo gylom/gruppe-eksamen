@@ -1,14 +1,19 @@
 import { useRef, useState } from "react"
+import type { Dispatch, SetStateAction } from "react"
 import { Link } from "react-router"
 import { Pencil, Plus } from "lucide-react"
 import { toast } from "sonner"
 
+import { SwipeActionRow } from "~/components/SwipeActionRow"
 import { DetailSheet } from "~/components/detail-sheet"
 import { Button, buttonVariants } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
 import { Label } from "~/components/ui/label"
 import { useCreateShoppingItem } from "~/features/shopping/use-create-shopping-item"
 import { useMaaleenheterLookup } from "~/features/shopping/use-maaleenheter-lookup"
+import { usePurchaseShoppingItem } from "~/features/shopping/use-purchase-shopping-item"
+import { usePurchasedShoppingList } from "~/features/shopping/use-purchased-shopping-list"
+import { useRestoreShoppingItem } from "~/features/shopping/use-restore-shopping-item"
 import { useShoppingList } from "~/features/shopping/use-shopping-list"
 import { useUpdateShoppingItem } from "~/features/shopping/use-update-shopping-item"
 import { useVaretyperLookup } from "~/features/shopping/use-varetyper-lookup"
@@ -41,12 +46,25 @@ function itemDisplayName(row: ActiveShoppingListRow): string {
   return row.varetype
 }
 
+function formatPurchasedAt(iso: string | null): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  return d.toLocaleString("nb-NO", { dateStyle: "short", timeStyle: "short" })
+}
+
+type ShopListView = "active" | "purchased"
+
 export default function ShopRoute() {
+  const [listView, setListView] = useState<ShopListView>("active")
   const listQuery = useShoppingList()
+  const purchasedQuery = usePurchasedShoppingList(listView === "purchased")
   const varetyperQuery = useVaretyperLookup()
   const maaleenheterQuery = useMaaleenheterLookup()
   const createItem = useCreateShoppingItem()
   const updateItem = useUpdateShoppingItem()
+  const purchaseItem = usePurchaseShoppingItem()
+  const restoreItem = useRestoreShoppingItem()
 
   const addButtonRef = useRef<HTMLButtonElement | null>(null)
   const returnFocusRef = useRef<HTMLButtonElement | null>(null)
@@ -61,6 +79,8 @@ export default function ShopRoute() {
   const [editingKilde, setEditingKilde] = useState<string | null>(null)
   const [editingVareId, setEditingVareId] = useState<number | null>(null)
   const [editingVaretypeId, setEditingVaretypeId] = useState<number | null>(null)
+  const [pendingPurchaseIds, setPendingPurchaseIds] = useState<Set<number>>(() => new Set())
+  const [pendingRestoreIds, setPendingRestoreIds] = useState<Set<number>>(() => new Set())
 
   const lookupsLoading = varetyperQuery.isLoading || maaleenheterQuery.isLoading
   const lookupsError = varetyperQuery.isError || maaleenheterQuery.isError
@@ -97,6 +117,48 @@ export default function ShopRoute() {
   function closeSheet(open: boolean) {
     setSheetOpen(open)
     if (!open) setFormError(null)
+  }
+
+  function addPendingId(setter: Dispatch<SetStateAction<Set<number>>>, id: number) {
+    setter((current) => {
+      const next = new Set(current)
+      next.add(id)
+      return next
+    })
+  }
+
+  function removePendingId(setter: Dispatch<SetStateAction<Set<number>>>, id: number) {
+    setter((current) => {
+      const next = new Set(current)
+      next.delete(id)
+      return next
+    })
+  }
+
+  function purchaseRow(id: number) {
+    if (pendingPurchaseIds.has(id)) return
+    addPendingId(setPendingPurchaseIds, id)
+    purchaseItem.mutate(id, {
+      onSuccess: () => toast.success("Markert som kjøpt"),
+      onError: (err) =>
+        toast.error(
+          err instanceof ApiError ? err.message : "Noe gikk galt. Prøv igjen.",
+        ),
+      onSettled: () => removePendingId(setPendingPurchaseIds, id),
+    })
+  }
+
+  function restoreRow(id: number) {
+    if (pendingRestoreIds.has(id)) return
+    addPendingId(setPendingRestoreIds, id)
+    restoreItem.mutate(id, {
+      onSuccess: () => toast.success("Lagt tilbake på listen"),
+      onError: (err) =>
+        toast.error(
+          err instanceof ApiError ? err.message : "Noe gikk galt. Prøv igjen.",
+        ),
+      onSettled: () => removePendingId(setPendingRestoreIds, id),
+    })
   }
 
   function parseQuantity(raw: string): { ok: true; value: number | null } | { ok: false; message: string } {
@@ -177,29 +239,75 @@ export default function ShopRoute() {
   const listEmpty = listQuery.isSuccess && list.length === 0
   const listLoading = listQuery.isLoading
 
+  const purchasedList = purchasedQuery.data?.varer ?? []
+  const purchasedEmpty = purchasedQuery.isSuccess && purchasedList.length === 0
+  const purchasedLoading = listView === "purchased" && purchasedQuery.isLoading
+
   return (
     <div className="flex min-h-0 flex-col">
       <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-tight">Handleliste</h1>
-            <p className="mt-0.5 text-xs text-muted-foreground">Aktive varer i husholdningen</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {listView === "active"
+                ? "Aktive varer i husholdningen"
+                : "Varer du har krysset av — gjenopprett ved feil"}
+            </p>
           </div>
-          <Button
-            ref={addButtonRef}
+          {listView === "active" ? (
+            <Button
+              ref={addButtonRef}
+              type="button"
+              size="sm"
+              className="shrink-0 gap-1"
+              onClick={() => openAdd(addButtonRef.current ?? undefined)}
+            >
+              <Plus className="size-4" aria-hidden />
+              Legg til
+            </Button>
+          ) : (
+            <span className="shrink-0" aria-hidden />
+          )}
+        </div>
+        <div
+          role="tablist"
+          aria-label="Handlelistevisning"
+          className="mt-3 flex gap-1 rounded-xl border border-border bg-muted/30 p-1"
+        >
+          <button
             type="button"
-            size="sm"
-            className="shrink-0 gap-1"
-            onClick={() => openAdd(addButtonRef.current ?? undefined)}
+            role="tab"
+            aria-selected={listView === "active"}
+            className={cn(
+              "min-h-9 min-w-0 flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+              listView === "active"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setListView("active")}
           >
-            <Plus className="size-4" aria-hidden />
-            Legg til
-          </Button>
+            Aktive
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={listView === "purchased"}
+            className={cn(
+              "min-h-9 min-w-0 flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+              listView === "purchased"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setListView("purchased")}
+          >
+            Kjøpte
+          </button>
         </div>
       </header>
 
       <div className="flex-1 px-4 pb-6 pt-4">
-        {listQuery.isError ? (
+        {listView === "active" && listQuery.isError ? (
           <section
             className="flex min-h-[220px] flex-col justify-center gap-4 rounded-xl border border-border bg-card/40 p-4"
             aria-live="polite"
@@ -222,7 +330,7 @@ export default function ShopRoute() {
           </section>
         ) : null}
 
-        {listLoading && !listQuery.isError ? (
+        {listView === "active" && listLoading && !listQuery.isError ? (
           <ul className="space-y-2" aria-hidden>
             {Array.from({ length: 5 }).map((_, i) => (
               <li
@@ -233,7 +341,7 @@ export default function ShopRoute() {
           </ul>
         ) : null}
 
-        {listQuery.isSuccess && listEmpty ? (
+        {listView === "active" && listQuery.isSuccess && listEmpty ? (
           <section
             className="flex min-h-[280px] flex-col items-center justify-center gap-5 rounded-2xl border border-dashed border-border/80 bg-muted/20 px-4 py-10 text-center"
             aria-label="Tom handleliste"
@@ -261,42 +369,141 @@ export default function ShopRoute() {
           </section>
         ) : null}
 
-        {listQuery.isSuccess && !listEmpty ? (
+        {listView === "active" && listQuery.isSuccess && !listEmpty ? (
           <ul className="space-y-2">
-            {list.map((row) => (
-              <li
-                key={row.id}
-                className="rounded-xl border border-border/80 bg-card/50 px-3 py-2.5 shadow-sm"
-              >
-                <div className="flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                      <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
-                        {formatQuantityLine(row)}
-                      </span>
-                      <span className="min-w-0 break-words text-sm font-medium leading-snug">
-                        {itemDisplayName(row)}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      <span className="font-medium text-foreground/80">{sourceKindLabel(row.kilde)}</span>
-                      <span aria-hidden> · </span>
-                      <span>{row.brukernavn}</span>
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    className="shrink-0 text-muted-foreground hover:text-foreground"
-                    aria-label={`Rediger ${itemDisplayName(row)}`}
-                    onClick={(e) => openEdit(row, e.currentTarget)}
+            {list.map((row) => {
+              const name = itemDisplayName(row)
+              const rowPurchasePending = pendingPurchaseIds.has(row.id)
+              return (
+                <li
+                  key={row.id}
+                  className="overflow-hidden rounded-xl border border-border/80 bg-card/50 shadow-sm"
+                >
+                  <SwipeActionRow
+                    actionLabel="Kjøpt"
+                    fallbackAriaLabel={`Marker ${name} som kjøpt`}
+                    loading={rowPurchasePending}
+                    disabled={rowPurchasePending}
+                    onAction={() => purchaseRow(row.id)}
                   >
-                    <Pencil className="size-4" aria-hidden />
-                  </Button>
-                </div>
-              </li>
+                    <div className="flex min-w-0 gap-2 pr-1">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+                            {formatQuantityLine(row)}
+                          </span>
+                          <span className="min-w-0 break-words text-sm font-medium leading-snug">
+                            {name}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground/80">{sourceKindLabel(row.kilde)}</span>
+                          <span aria-hidden> · </span>
+                          <span>{row.brukernavn}</span>
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                        aria-label={`Rediger ${name}`}
+                        disabled={rowPurchasePending}
+                        onClick={(e) => openEdit(row, e.currentTarget)}
+                      >
+                        <Pencil className="size-4" aria-hidden />
+                      </Button>
+                    </div>
+                  </SwipeActionRow>
+                </li>
+              )
+            })}
+          </ul>
+        ) : null}
+
+        {listView === "purchased" && purchasedQuery.isError ? (
+          <section
+            className="flex min-h-[220px] flex-col justify-center gap-4 rounded-xl border border-border bg-card/40 p-4"
+            aria-live="polite"
+          >
+            <div>
+              <h2 className="text-base font-medium">Kunne ikke laste kjøpte varer</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Sjekk nettverket og prøv på nytt.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-fit"
+              disabled={purchasedQuery.isFetching}
+              onClick={() => void purchasedQuery.refetch()}
+            >
+              Prøv igjen
+            </Button>
+          </section>
+        ) : null}
+
+        {listView === "purchased" && purchasedLoading && !purchasedQuery.isError ? (
+          <ul className="space-y-2" aria-hidden>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <li key={i} className="h-[4.25rem] animate-pulse rounded-xl bg-muted/60" />
             ))}
+          </ul>
+        ) : null}
+
+        {listView === "purchased" && purchasedQuery.isSuccess && purchasedEmpty ? (
+          <section
+            className="flex min-h-[280px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/80 bg-muted/20 px-4 py-10 text-center"
+            aria-label="Ingen kjøpte varer"
+          >
+            <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
+              Her vises varer du krysser av mens du handler. Alt kan gjenopprettes til den aktive listen.
+              Fullføring av handleturen kommer senere.
+            </p>
+          </section>
+        ) : null}
+
+        {listView === "purchased" && purchasedQuery.isSuccess && !purchasedEmpty ? (
+          <ul className="space-y-2">
+            {purchasedList.map((row) => {
+              const name = itemDisplayName(row)
+              const rowRestorePending = pendingRestoreIds.has(row.id)
+              const boughtLine = formatPurchasedAt(row.purchasedAt)
+              return (
+                <li
+                  key={row.id}
+                  className="overflow-hidden rounded-xl border border-border/80 bg-card/50 shadow-sm"
+                >
+                  <SwipeActionRow
+                    actionLabel="Gjenopprett"
+                    fallbackAriaLabel={`Gjenopprett ${name} til aktiv liste`}
+                    loading={rowRestorePending}
+                    disabled={rowRestorePending}
+                    onAction={() => restoreRow(row.id)}
+                  >
+                    <div className="min-w-0 pr-1">
+                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                        <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+                          {formatQuantityLine(row)}
+                        </span>
+                        <span className="min-w-0 break-words text-sm font-medium leading-snug">{name}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground/80">{sourceKindLabel(row.kilde)}</span>
+                        <span aria-hidden> · </span>
+                        <span>{row.brukernavn}</span>
+                      </p>
+                      <p className="mt-1 text-xs font-medium text-foreground">
+                        <span className="rounded-md border border-border bg-muted/50 px-1.5 py-0.5">
+                          Kjøpt{boughtLine ? ` · ${boughtLine}` : ""}
+                        </span>
+                      </p>
+                    </div>
+                  </SwipeActionRow>
+                </li>
+              )
+            })}
           </ul>
         ) : null}
       </div>

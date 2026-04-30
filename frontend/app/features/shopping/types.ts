@@ -43,6 +43,16 @@ export type ShoppingListGetResponse = {
   forslag: ShoppingListStockSuggestion[]
 }
 
+export type ShoppingListPurchasedResponse = {
+  varer: ActiveShoppingListRow[]
+}
+
+export type PurchaseRestoreShoppingItemResponse = {
+  message: string
+  id: number
+  purchasedAt: string | null
+}
+
 export type CreateShoppingItemBody = {
   varetypeId: number
   vareId?: number | null

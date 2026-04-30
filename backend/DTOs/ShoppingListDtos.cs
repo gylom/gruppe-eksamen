@@ -53,6 +53,19 @@ public class ShoppingListGetResponse
     public List<ShoppingListStockSuggestionDto> Forslag { get; set; } = new();
 }
 
+/// <summary>Household purchased/hidden rows only (same row shape as active, under <c>Varer</c>).</summary>
+public class ShoppingListPurchasedResponse
+{
+    public List<ActiveShoppingListRowDto> Varer { get; set; } = new();
+}
+
+public class ShoppingListPurchaseRestoreResponse
+{
+    public string Message { get; set; } = string.Empty;
+    public ulong Id { get; set; }
+    public DateTime? PurchasedAt { get; set; }
+}
+
 public class GenerateShoppingSuggestionsRequest
 {
     public string WeekStartDate { get; set; } = string.Empty;

@@ -1,6 +1,6 @@
 # Story 4.2: Purchase and Restore Shopping Rows
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -38,61 +38,66 @@ so that the active list stays focused while shopping remains reversible.
 
 ## Tasks / Subtasks
 
-- [ ] **T1: Extend the backend shopping contract for purchased rows** (AC: 1, 3, 4)
-  - [ ] Keep `GET /api/handleliste` returning only active rows where `PurchasedAt == null`; do not break the Story 4.1 active-list contract or its `forslag` payload.
-  - [ ] Add a household-scoped purchased/hidden read endpoint, preferably `GET /api/handleliste/purchased`, returning the same row DTO shape under `varer`.
-  - [ ] Treat the current v1 hidden state as `PurchasedAt != null`; do not add a separate hidden table/column unless implementation discovers a real existing schema hook.
-  - [ ] Include purchased rows created manually and from planned meals.
-  - [ ] Preserve `Kilde`, `PlanlagtMaaltidId`, `PlanlagteMaaltidLinker`, creator `UserId`, item/unit fields, and timestamps when moving rows between active and purchased states.
+- [x] **T1: Extend the backend shopping contract for purchased rows** (AC: 1, 3, 4)
+  - [x] Keep `GET /api/handleliste` returning only active rows where `PurchasedAt == null`; do not break the Story 4.1 active-list contract or its `forslag` payload.
+  - [x] Add a household-scoped purchased/hidden read endpoint, preferably `GET /api/handleliste/purchased`, returning the same row DTO shape under `varer`.
+  - [x] Treat the current v1 hidden state as `PurchasedAt != null`; do not add a separate hidden table/column unless implementation discovers a real existing schema hook.
+  - [x] Include purchased rows created manually and from planned meals.
+  - [x] Preserve `Kilde`, `PlanlagtMaaltidId`, `PlanlagteMaaltidLinker`, creator `UserId`, item/unit fields, and timestamps when moving rows between active and purchased states.
 
-- [ ] **T2: Add purchase and restore mutations** (AC: 1, 4)
-  - [ ] Add a household-scoped endpoint to mark a row purchased, e.g. `POST /api/handleliste/{id}/purchase`.
-  - [ ] Add a household-scoped endpoint to restore a row, e.g. `POST /api/handleliste/{id}/restore`.
-  - [ ] Validate route ids before casting from `long` to `ulong`.
-  - [ ] Purchase sets `PurchasedAt = DateTime.UtcNow` only when currently null; if already purchased, return a successful idempotent response with no destructive change.
-  - [ ] Restore clears `PurchasedAt`; if already active, return a successful idempotent response.
-  - [ ] Do not overwrite `UserId` when a different household member purchases or restores a row; `UserId` remains row creator/owner attribution in the current schema.
-  - [ ] Return user-facing backend errors as `{ message = "..." }`.
-  - [ ] Do not implement purchase completion, archiving, inventory/stock changes, or cookbook graduation in this story.
+- [x] **T2: Add purchase and restore mutations** (AC: 1, 4)
+  - [x] Add a household-scoped endpoint to mark a row purchased, e.g. `POST /api/handleliste/{id}/purchase`.
+  - [x] Add a household-scoped endpoint to restore a row, e.g. `POST /api/handleliste/{id}/restore`.
+  - [x] Validate route ids before casting from `long` to `ulong`.
+  - [x] Purchase sets `PurchasedAt = DateTime.UtcNow` only when currently null; if already purchased, return a successful idempotent response with no destructive change.
+  - [x] Restore clears `PurchasedAt`; if already active, return a successful idempotent response.
+  - [x] Do not overwrite `UserId` when a different household member purchases or restores a row; `UserId` remains row creator/owner attribution in the current schema.
+  - [x] Return user-facing backend errors as `{ message = "..." }`.
+  - [x] Do not implement purchase completion, archiving, inventory/stock changes, or cookbook graduation in this story.
 
-- [ ] **T3: Add frontend shopping types and hooks** (AC: 1, 3, 4)
-  - [ ] Extend `frontend/app/features/shopping/types.ts` only as needed for purchased-list and mutation responses.
-  - [ ] Add a purchased rows query hook, using a stable query key such as `["shopping-list", "purchased"]`.
-  - [ ] Add `usePurchaseShoppingItem` and `useRestoreShoppingItem` mutations using `apiFetch`; do not call `fetch` directly.
-  - [ ] On purchase/restore success, invalidate `["shopping-list"]` and `["shopping-list", "purchased"]`.
-  - [ ] Keep Story 4.1 create/update hooks and Epic 3 suggestion hooks intact.
+- [x] **T3: Add frontend shopping types and hooks** (AC: 1, 3, 4)
+  - [x] Extend `frontend/app/features/shopping/types.ts` only as needed for purchased-list and mutation responses.
+  - [x] Add a purchased rows query hook, using a stable query key such as `["shopping-list", "purchased"]`.
+  - [x] Add `usePurchaseShoppingItem` and `useRestoreShoppingItem` mutations using `apiFetch`; do not call `fetch` directly.
+  - [x] On purchase/restore success, invalidate `["shopping-list"]` and `["shopping-list", "purchased"]`.
+  - [x] Keep Story 4.1 create/update hooks and Epic 3 suggestion hooks intact.
 
-- [ ] **T4: Update the Shop route for active purchase actions** (AC: 1, 2)
-  - [ ] Wrap active rows in `SwipeActionRow`; use a consistent gesture direction for progress/purchase actions.
-  - [ ] Keep the fallback tap button visible and keyboard reachable with an explicit aria label.
-  - [ ] While a row purchase mutation is pending, disable only that row's purchase/edit actions.
-  - [ ] When purchase succeeds, show concise toast feedback and let query invalidation remove the row from the active list.
-  - [ ] Keep quantity/unit, item name, source label, and member attribution visible on active rows.
-  - [ ] Preserve row stability and wrapping at 360px; long item names must not overlap edit or purchase controls.
+- [x] **T4: Update the Shop route for active purchase actions** (AC: 1, 2)
+  - [x] Wrap active rows in `SwipeActionRow`; use a consistent gesture direction for progress/purchase actions.
+  - [x] Keep the fallback tap button visible and keyboard reachable with an explicit aria label.
+  - [x] While a row purchase mutation is pending, disable only that row's purchase/edit actions.
+  - [x] When purchase succeeds, show concise toast feedback and let query invalidation remove the row from the active list.
+  - [x] Keep quantity/unit, item name, source label, and member attribution visible on active rows.
+  - [x] Preserve row stability and wrapping at 360px; long item names must not overlap edit or purchase controls.
 
-- [ ] **T5: Add the hidden/purchased view and restore UI** (AC: 3, 4)
-  - [ ] Add an in-route view switch, segmented control, tab, or compact toggle for Active vs Purchased/hidden rows; keep `/app/shop` as the route.
-  - [ ] Show purchased rows separately with quantity/unit, item name, source label, member attribution, and a non-color-only purchased status/timestamp where available.
-  - [ ] Use `SwipeActionRow` for restore if swipe is offered, and always provide a tap fallback.
-  - [ ] Restore success should show toast feedback and move the row back to active through query invalidation.
-  - [ ] Purchased rows should not open the edit sheet until restored; keep the data model simple and avoid editing hidden state directly.
-  - [ ] Empty purchased view should explain that purchased items will appear there after shopping, without implying archive/completion has happened.
+- [x] **T5: Add the hidden/purchased view and restore UI** (AC: 3, 4)
+  - [x] Add an in-route view switch, segmented control, tab, or compact toggle for Active vs Purchased/hidden rows; keep `/app/shop` as the route.
+  - [x] Show purchased rows separately with quantity/unit, item name, source label, member attribution, and a non-color-only purchased status/timestamp where available.
+  - [x] Use `SwipeActionRow` for restore if swipe is offered, and always provide a tap fallback.
+  - [x] Restore success should show toast feedback and move the row back to active through query invalidation.
+  - [x] Purchased rows should not open the edit sheet until restored; keep the data model simple and avoid editing hidden state directly.
+  - [x] Empty purchased view should explain that purchased items will appear there after shopping, without implying archive/completion has happened.
 
-- [ ] **T6: Guard the boundary with Story 4.3** (AC: 1, 3, 4)
-  - [ ] Do not add an archive flag, completed-trip model, cookbook endpoint, inventory deduction, or purchase-complete confirmation sheet here.
-  - [ ] Do not delete rows to simulate purchase. Purchased rows must remain restorable and available for Story 4.3 completion.
-  - [ ] Do not create a cookbook table.
-  - [ ] Do not change generated-suggestion confirmation behavior unless it is required to keep the active/purchased split coherent.
+- [x] **T6: Guard the boundary with Story 4.3** (AC: 1, 3, 4)
+  - [x] Do not add an archive flag, completed-trip model, cookbook endpoint, inventory deduction, or purchase-complete confirmation sheet here.
+  - [x] Do not delete rows to simulate purchase. Purchased rows must remain restorable and available for Story 4.3 completion.
+  - [x] Do not create a cookbook table.
+  - [x] Do not change generated-suggestion confirmation behavior unless it is required to keep the active/purchased split coherent.
 
-- [ ] **T7: Verify the story** (AC: 1, 2, 3, 4)
-  - [ ] Run `dotnet build backend/backend.csproj`.
-  - [ ] Run `npm run typecheck --prefix frontend`.
-  - [ ] Run `npm run build` because this changes frontend source and backend-served SPA output.
+- [x] **T7: Verify the story** (AC: 1, 2, 3, 4)
+  - [x] Run `dotnet build backend/backend.csproj`.
+  - [x] Run `npm run typecheck --prefix frontend`.
+  - [x] Run `npm run build` because this changes frontend source and backend-served SPA output.
   - [ ] Manual/API smoke: mark a manual active row purchased, confirm `GET /api/handleliste` excludes it and the purchased endpoint includes it.
   - [ ] Manual/API smoke: restore that row and confirm it returns to the active list.
   - [ ] Manual/API smoke: mark a recipe-derived row purchased and confirm `kilde`, `planlagtMaaltidId`, and planned-meal link behavior remain intact.
   - [ ] Manual/API smoke: after marking a recipe-derived row purchased, trying to delete its planned meal should still return the existing 409 protection.
   - [ ] Manual UI smoke at 360px and desktop-centered width: active rows, purchased view, swipe fallback buttons, long names, pending states, and bottom nav do not overlap.
+
+### Review Findings
+
+- [x] [Review][Patch] Guard restore/add flows against active duplicates [backend/Controllers/HandlelisteController.cs:191]
+- [x] [Review][Patch] Track pending purchase/restore state per row, not only the latest mutation variables [frontend/app/routes/app/shop.tsx:331]
 
 ## Dev Notes
 
@@ -274,4 +279,18 @@ Ultimate context engine analysis completed - comprehensive developer guide creat
 
 ### Completion Notes List
 
+- Backend: `GET /api/handleliste/purchased`, `POST .../purchase`, `POST .../restore` with idempotent behavior; `ShoppingListPurchasedResponse` + `ShoppingListPurchaseRestoreResponse` DTOs.
+- Frontend: `usePurchasedShoppingList` (enabled on Kjøpte tab), `usePurchaseShoppingItem`, `useRestoreShoppingItem`; shop route tabs Aktive/Kjøpte with `SwipeActionRow` for kjøpt/gjenopprett.
+- Verified: `npm run typecheck`, `npm run build`; `dotnet build` to alternate `-o` path when `backend.exe` is locked.
+
 ### File List
+
+- `backend/Controllers/HandlelisteController.cs`
+- `backend/DTOs/ShoppingListDtos.cs`
+- `frontend/app/features/shopping/types.ts`
+- `frontend/app/features/shopping/use-purchased-shopping-list.ts`
+- `frontend/app/features/shopping/use-purchase-shopping-item.ts`
+- `frontend/app/features/shopping/use-restore-shopping-item.ts`
+- `frontend/app/routes/app/shop.tsx`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/4-2-purchase-and-restore-shopping-rows.md`
