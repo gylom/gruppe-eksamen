@@ -9,7 +9,9 @@ import { DetailSheet } from "~/components/detail-sheet"
 import { Button, buttonVariants } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
 import { Label } from "~/components/ui/label"
+import { useCompleteShoppingTrip } from "~/features/shopping/use-complete-shopping-trip"
 import { useCreateShoppingItem } from "~/features/shopping/use-create-shopping-item"
+import { useShoppingCompletionPreview } from "~/features/shopping/use-shopping-completion-preview"
 import { useMaaleenheterLookup } from "~/features/shopping/use-maaleenheter-lookup"
 import { usePurchaseShoppingItem } from "~/features/shopping/use-purchase-shopping-item"
 import { usePurchasedShoppingList } from "~/features/shopping/use-purchased-shopping-list"
@@ -22,6 +24,7 @@ import { ApiError } from "~/lib/api-fetch"
 import { cn } from "~/lib/utils"
 
 const SHOP_ITEM_SHEET_TITLE_ID = "shop-item-sheet-title"
+const SHOP_COMPLETE_SHEET_TITLE_ID = "shop-complete-sheet-title"
 
 const selectStyles = cn(
   "h-9 w-full min-w-0 rounded-4xl border border-input bg-input/30 px-3 py-1 text-base transition-colors outline-none",
@@ -58,7 +61,10 @@ type ShopListView = "active" | "purchased"
 export default function ShopRoute() {
   const [listView, setListView] = useState<ShopListView>("active")
   const listQuery = useShoppingList()
-  const purchasedQuery = usePurchasedShoppingList(listView === "purchased")
+  const purchasedQuery = usePurchasedShoppingList(true)
+  const [completeSheetOpen, setCompleteSheetOpen] = useState(false)
+  const previewQuery = useShoppingCompletionPreview(completeSheetOpen)
+  const completeTrip = useCompleteShoppingTrip()
   const varetyperQuery = useVaretyperLookup()
   const maaleenheterQuery = useMaaleenheterLookup()
   const createItem = useCreateShoppingItem()
@@ -68,6 +74,7 @@ export default function ShopRoute() {
 
   const addButtonRef = useRef<HTMLButtonElement | null>(null)
   const returnFocusRef = useRef<HTMLButtonElement | null>(null)
+  const completeTripReturnFocusRef = useRef<HTMLButtonElement | null>(null)
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const [sheetMode, setSheetMode] = useState<"add" | "edit">("add")
@@ -240,7 +247,10 @@ export default function ShopRoute() {
   const listLoading = listQuery.isLoading
 
   const purchasedList = purchasedQuery.data?.varer ?? []
-  const purchasedEmpty = purchasedQuery.isSuccess && purchasedList.length === 0
+  const purchasedCount = purchasedList.length
+  const purchasedEmpty = purchasedQuery.isSuccess && purchasedCount === 0
+  const showCompleteTrip =
+    purchasedQuery.isSuccess && (purchasedCount > 0 || listView === "purchased")
   const purchasedLoading = listView === "purchased" && purchasedQuery.isLoading
 
   return (
@@ -304,6 +314,21 @@ export default function ShopRoute() {
             Kjøpte
           </button>
         </div>
+        {showCompleteTrip ? (
+          <div className="mt-3">
+            <Button
+              ref={completeTripReturnFocusRef}
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="w-full min-h-10 rounded-2xl font-medium"
+              disabled={purchasedCount === 0}
+              onClick={() => setCompleteSheetOpen(true)}
+            >
+              Fullfør handletur
+            </Button>
+          </div>
+        ) : null}
       </header>
 
       <div className="flex-1 px-4 pb-6 pt-4">
@@ -458,8 +483,8 @@ export default function ShopRoute() {
             aria-label="Ingen kjøpte varer"
           >
             <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
-              Her vises varer du krysser av mens du handler. Alt kan gjenopprettes til den aktive listen.
-              Fullføring av handleturen kommer senere.
+              Her vises varer du krysser av mens du handler. Du kan gjenopprette til den aktive listen, eller fullføre
+              handleturen når du er ferdig.
             </p>
           </section>
         ) : null}
@@ -604,6 +629,103 @@ export default function ShopRoute() {
             </div>
           </div>
         )}
+      </DetailSheet>
+
+      <DetailSheet
+        open={completeSheetOpen}
+        onOpenChange={setCompleteSheetOpen}
+        labelledById={SHOP_COMPLETE_SHEET_TITLE_ID}
+        title="Fullfør handletur?"
+        description="Bekreft når du er ferdig i butikken. Kjøpte rader arkiveres for kokebok senere; aktive rader blir stående."
+        returnFocusRef={completeTripReturnFocusRef}
+        footer={
+          <div className="flex w-full gap-2 px-1">
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 flex-1 rounded-2xl"
+              disabled={completeTrip.isPending}
+              onClick={() => setCompleteSheetOpen(false)}
+            >
+              Avbryt
+            </Button>
+            <Button
+              type="button"
+              className="min-h-11 flex-1 rounded-2xl"
+              disabled={
+                completeTrip.isPending ||
+                previewQuery.isLoading ||
+                previewQuery.isFetching ||
+                previewQuery.isError ||
+                !previewQuery.data ||
+                previewQuery.data.archiveRowCount < 1
+              }
+              onClick={() =>
+                completeTrip.mutate(undefined, {
+                  onSuccess: (data) => {
+                    setCompleteSheetOpen(false)
+                    if (data.archiveRowCount > 0) {
+                      toast.success("Handletur fullført")
+                    } else {
+                      toast.info("Ingenting nytt å arkivere")
+                    }
+                  },
+                  onError: (err) =>
+                    toast.error(
+                      err instanceof ApiError ? err.message : "Noe gikk galt. Prøv igjen.",
+                    ),
+                })
+              }
+            >
+              {completeTrip.isPending ? "Fullfører…" : "Bekreft"}
+            </Button>
+          </div>
+        }
+      >
+        {previewQuery.isLoading ? (
+          <div className="space-y-3" aria-busy="true">
+            <div className="h-10 animate-pulse rounded-xl bg-muted/80" />
+            <div className="h-10 animate-pulse rounded-xl bg-muted/80" />
+            <div className="h-10 animate-pulse rounded-xl bg-muted/80" />
+          </div>
+        ) : previewQuery.isError ? (
+          <div className="space-y-3">
+            <p className="text-sm text-destructive">Kunne ikke hente oppsummering.</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-2xl"
+              onClick={() => void previewQuery.refetch()}
+            >
+              Prøv igjen
+            </Button>
+          </div>
+        ) : previewQuery.data ? (
+          <ul className="list-none space-y-3 text-sm leading-snug text-foreground">
+            <li className="rounded-xl border border-border/80 bg-muted/20 px-3 py-2.5">
+              <span className="font-medium text-foreground">Arkiveres</span>
+              <span className="mt-0.5 block tabular-nums text-muted-foreground">
+                {previewQuery.data.archiveRowCount}{" "}
+                {previewQuery.data.archiveRowCount === 1 ? "rad" : "rader"}
+              </span>
+            </li>
+            <li className="rounded-xl border border-border/80 bg-muted/20 px-3 py-2.5">
+              <span className="font-medium text-foreground">Kokebok (senere)</span>
+              <span className="mt-0.5 block tabular-nums text-muted-foreground">
+                {previewQuery.data.cookbookMealCount}{" "}
+                {previewQuery.data.cookbookMealCount === 1 ? "måltid" : "måltider"}
+              </span>
+            </li>
+            <li className="rounded-xl border border-border/80 bg-muted/20 px-3 py-2.5">
+              <span className="font-medium text-foreground">Forblir på aktiv liste</span>
+              <span className="mt-0.5 block tabular-nums text-muted-foreground">
+                {previewQuery.data.remainingActiveRowCount}{" "}
+                {previewQuery.data.remainingActiveRowCount === 1 ? "rad" : "rader"}
+              </span>
+            </li>
+          </ul>
+        ) : null}
       </DetailSheet>
     </div>
   )

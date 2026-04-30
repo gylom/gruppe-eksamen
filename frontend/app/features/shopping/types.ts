@@ -47,6 +47,13 @@ export type ShoppingListPurchasedResponse = {
   varer: ActiveShoppingListRow[]
 }
 
+export type ShoppingListCompletionSummary = {
+  archiveRowCount: number
+  cookbookMealCount: number
+  remainingActiveRowCount: number
+  archivedAt: string | null
+}
+
 export type PurchaseRestoreShoppingItemResponse = {
   message: string
   id: number

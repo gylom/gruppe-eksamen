@@ -59,6 +59,15 @@ public class ShoppingListPurchasedResponse
     public List<ActiveShoppingListRowDto> Varer { get; set; } = new();
 }
 
+/// <summary>Preview and completion summary for purchase completion (camelCase JSON).</summary>
+public class ShoppingListCompletionSummaryDto
+{
+    public int ArchiveRowCount { get; set; }
+    public int CookbookMealCount { get; set; }
+    public int RemainingActiveRowCount { get; set; }
+    public DateTime? ArchivedAt { get; set; }
+}
+
 public class ShoppingListPurchaseRestoreResponse
 {
     public string Message { get; set; } = string.Empty;

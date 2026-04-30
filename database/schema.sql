@@ -267,6 +267,7 @@ CREATE TABLE Handleliste (
     endret DATETIME,
     planlagt_maaltid_id BIGINT UNSIGNED NULL,
     purchased_at DATETIME NULL,
+    archived_at DATETIME NULL,
     kilde VARCHAR(32) NOT NULL DEFAULT 'manual',
 
     KEY idx_handleliste_planlagt_maaltid (planlagt_maaltid_id),

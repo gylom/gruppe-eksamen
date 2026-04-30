@@ -15,6 +15,7 @@ export function usePurchaseShoppingItem() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["shopping-list"] })
       await queryClient.invalidateQueries({ queryKey: ["shopping-list", "purchased"] })
+      await queryClient.invalidateQueries({ queryKey: ["shopping-list", "completion-preview"] })
     },
   })
 }

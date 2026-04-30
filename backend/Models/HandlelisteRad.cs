@@ -36,6 +36,9 @@ public class HandlelisteRad
     [Column("purchased_at")]
     public DateTime? PurchasedAt { get; set; }
 
+    [Column("archived_at")]
+    public DateTime? ArchivedAt { get; set; }
+
     /// <summary>e.g. manual, plannedMeal</summary>
     [Column("kilde")]
     public string Kilde { get; set; } = "manual";

@@ -1,6 +1,6 @@
 # Story 4.3: Purchase Completion and Archiving
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -38,61 +38,69 @@ so that purchased rows are archived and the household routine can continue into 
 
 ## Tasks / Subtasks
 
-- [ ] **T1: Add persistent archive state to shopping rows** (AC: 2, 3)
-  - [ ] Add a nullable `archived_at` column to `Handleliste` through a SQL migration in `database/`; do not use EF migrations.
-  - [ ] Update `database/schema.sql` so new installs include `archived_at DATETIME NULL`.
-  - [ ] Add `ArchivedAt` to `backend/Models/HandlelisteRad.cs` mapped to `archived_at`.
-  - [ ] Keep existing `PurchasedAt` semantics intact: purchased rows remain the prerequisite for archiving and cookbook derivation.
-  - [ ] Do not delete shopping rows to archive them; archived recipe-derived rows must remain queryable for Story 5.1 cookbook history.
+- [x] **T1: Add persistent archive state to shopping rows** (AC: 2, 3)
+  - [x] Add a nullable `archived_at` column to `Handleliste` through a SQL migration in `database/`; do not use EF migrations.
+  - [x] Update `database/schema.sql` so new installs include `archived_at DATETIME NULL`.
+  - [x] Add `ArchivedAt` to `backend/Models/HandlelisteRad.cs` mapped to `archived_at`.
+  - [x] Keep existing `PurchasedAt` semantics intact: purchased rows remain the prerequisite for archiving and cookbook derivation.
+  - [x] Do not delete shopping rows to archive them; archived recipe-derived rows must remain queryable for Story 5.1 cookbook history.
 
-- [ ] **T2: Keep active and restorable purchased queries scoped correctly** (AC: 2)
-  - [ ] Keep `GET /api/handleliste` returning only active rows where `PurchasedAt == null`.
-  - [ ] Update `GET /api/handleliste/purchased` to return only purchased, not-yet-archived rows: `PurchasedAt != null && ArchivedAt == null`.
-  - [ ] Preserve the existing DTO shape under `varer`; add `archivedAt` only if the frontend needs it for completion feedback.
-  - [ ] Update shopping-row duplicate checks so archived rows count as history, not current list occupancy.
-  - [ ] In manual create, suggestion generation, and suggestion confirmation, treat only unarchived rows (`ArchivedAt == null`) as already on the current shopping list.
-  - [ ] Preserve household scoping through `Medlemmer`; never accept household ids from the client.
+- [x] **T2: Keep active and restorable purchased queries scoped correctly** (AC: 2)
+  - [x] Keep `GET /api/handleliste` returning only active rows where `PurchasedAt == null`.
+  - [x] Update `GET /api/handleliste/purchased` to return only purchased, not-yet-archived rows: `PurchasedAt != null && ArchivedAt == null`.
+  - [x] Preserve the existing DTO shape under `varer`; add `archivedAt` only if the frontend needs it for completion feedback.
+  - [x] Update shopping-row duplicate checks so archived rows count as history, not current list occupancy.
+  - [x] In manual create, suggestion generation, and suggestion confirmation, treat only unarchived rows (`ArchivedAt == null`) as already on the current shopping list.
+  - [x] Preserve household scoping through `Medlemmer`; never accept household ids from the client.
 
-- [ ] **T3: Add preview and completion backend endpoints** (AC: 1, 2, 3)
-  - [ ] Add a preview endpoint, preferably `GET /api/handleliste/completion-preview`, that returns counts for `archiveRowCount`, `cookbookMealCount`, and `remainingActiveRowCount`.
-  - [ ] Compute `archiveRowCount` from household rows where `PurchasedAt != null && ArchivedAt == null`.
-  - [ ] Compute `cookbookMealCount` from distinct planned-meal ids linked to those purchased recipe-derived rows, using both `Handleliste.PlanlagtMaaltidId` and `HandlelistePlanlagteMaaltider`.
-  - [ ] Add a completion endpoint, preferably `POST /api/handleliste/complete`, that sets `ArchivedAt = DateTime.UtcNow` only for household rows where `PurchasedAt != null && ArchivedAt == null`.
-  - [ ] Return a response with the same summary fields after completion.
-  - [ ] Make repeat calls successful and harmless: when no unarchived purchased rows remain, return zero newly archived rows instead of creating duplicate history or failing.
-  - [ ] Return user-facing errors as `{ message = "..." }`.
+- [x] **T3: Add preview and completion backend endpoints** (AC: 1, 2, 3)
+  - [x] Add a preview endpoint, preferably `GET /api/handleliste/completion-preview`, that returns counts for `archiveRowCount`, `cookbookMealCount`, and `remainingActiveRowCount`.
+  - [x] Compute `archiveRowCount` from household rows where `PurchasedAt != null && ArchivedAt == null`.
+  - [x] Compute `cookbookMealCount` from distinct planned-meal ids linked to those purchased recipe-derived rows, using both `Handleliste.PlanlagtMaaltidId` and `HandlelistePlanlagteMaaltider`.
+  - [x] Add a completion endpoint, preferably `POST /api/handleliste/complete`, that sets `ArchivedAt = DateTime.UtcNow` only for household rows where `PurchasedAt != null && ArchivedAt == null`.
+  - [x] Return a response with the same summary fields after completion.
+  - [x] Make repeat calls successful and harmless: when no unarchived purchased rows remain, return zero newly archived rows instead of creating duplicate history or failing.
+  - [x] Return user-facing errors as `{ message = "..." }`.
 
-- [ ] **T4: Preserve cookbook derivation boundary for Story 5.1** (AC: 2, 3)
-  - [ ] Do not create a cookbook table.
-  - [ ] Do not implement cookbook search, sorting, re-planning, or rating UI in this story.
-  - [ ] Leave `frontend/app/routes/app/book.tsx` as a placeholder unless a minimal invalidation target is needed.
-  - [ ] Ensure archived purchased recipe-derived rows keep `Kilde`, `PlanlagtMaaltidId`, and `HandlelistePlanlagteMaaltider` provenance.
-  - [ ] Keep `PlanlagteMaaltiderController.DeletePlannedMeal` protection working for purchased/archived recipe-derived rows.
+- [x] **T4: Preserve cookbook derivation boundary for Story 5.1** (AC: 2, 3)
+  - [x] Do not create a cookbook table.
+  - [x] Do not implement cookbook search, sorting, re-planning, or rating UI in this story.
+  - [x] Leave `frontend/app/routes/app/book.tsx` as a placeholder unless a minimal invalidation target is needed.
+  - [x] Ensure archived purchased recipe-derived rows keep `Kilde`, `PlanlagtMaaltidId`, and `HandlelistePlanlagteMaaltider` provenance.
+  - [x] Keep `PlanlagteMaaltiderController.DeletePlannedMeal` protection working for purchased/archived recipe-derived rows.
 
-- [ ] **T5: Add frontend completion types and hooks** (AC: 1, 4)
-  - [ ] Extend `frontend/app/features/shopping/types.ts` with preview/completion response types.
-  - [ ] Add a preview query hook under `frontend/app/features/shopping`, using a stable key such as `["shopping-list", "completion-preview"]` and enabling it only while the confirmation sheet is open.
-  - [ ] Add a completion mutation hook under `frontend/app/features/shopping` using `apiFetch`; do not call `fetch` directly.
-  - [ ] On completion success, invalidate `["shopping-list"]`, `["shopping-list", "purchased"]`, `["shopping-list", "completion-preview"]`, and the future cookbook key `["cookbook"]`.
-  - [ ] Use TanStack Query v5 `useQueryClient()` plus `queryClient.invalidateQueries({ queryKey })`; use `Promise.all` when invalidating multiple keys.
+- [x] **T5: Add frontend completion types and hooks** (AC: 1, 4)
+  - [x] Extend `frontend/app/features/shopping/types.ts` with preview/completion response types.
+  - [x] Add a preview query hook under `frontend/app/features/shopping`, using a stable key such as `["shopping-list", "completion-preview"]` and enabling it only while the confirmation sheet is open.
+  - [x] Add a completion mutation hook under `frontend/app/features/shopping` using `apiFetch`; do not call `fetch` directly.
+  - [x] On completion success, invalidate `["shopping-list"]`, `["shopping-list", "purchased"]`, `["shopping-list", "completion-preview"]`, and the future cookbook key `["cookbook"]`.
+  - [x] Use TanStack Query v5 `useQueryClient()` plus `queryClient.invalidateQueries({ queryKey })`; use `Promise.all` when invalidating multiple keys.
 
-- [ ] **T6: Add the purchase-complete confirmation UI in `/app/shop`** (AC: 1, 4)
-  - [ ] Keep the flow in `frontend/app/routes/app/shop.tsx`; do not add a new route.
-  - [ ] Add a visible "Purchase complete" action when purchased rows exist or from the purchased view, and disable it when no unarchived purchased rows are available.
-  - [ ] Open a `DetailSheet` confirmation sheet before mutation.
-  - [ ] Show the preview summary: rows to archive, cookbook meals unlocked for later history, and active rows that will remain on the list.
-  - [ ] Make the confirm button explicit, pending-safe, and keyboard reachable.
-  - [ ] Show concise success feedback after completion and let query invalidation move archived rows out of the purchased view.
-  - [ ] Keep product screen copy Norwegian and compact.
+- [x] **T6: Add the purchase-complete confirmation UI in `/app/shop`** (AC: 1, 4)
+  - [x] Keep the flow in `frontend/app/routes/app/shop.tsx`; do not add a new route.
+  - [x] Add a visible "Purchase complete" action when purchased rows exist or from the purchased view, and disable it when no unarchived purchased rows are available.
+  - [x] Open a `DetailSheet` confirmation sheet before mutation.
+  - [x] Show the preview summary: rows to archive, cookbook meals unlocked for later history, and active rows that will remain on the list.
+  - [x] Make the confirm button explicit, pending-safe, and keyboard reachable.
+  - [x] Show concise success feedback after completion and let query invalidation move archived rows out of the purchased view.
+  - [x] Keep product screen copy Norwegian and compact.
 
 - [ ] **T7: Verify the story** (AC: 1, 2, 3, 4)
-  - [ ] Run `dotnet build backend/backend.csproj` or the established alternate output build if the normal backend executable is locked.
-  - [ ] Run `npm run typecheck --prefix frontend`.
-  - [ ] Run `npm run build` because this changes frontend source, backend code, database schema, and the backend-served SPA output.
+  - [x] Run `dotnet build backend/backend.csproj` or the established alternate output build if the normal backend executable is locked.
+  - [x] Run `npm run typecheck --prefix frontend`.
+  - [x] Run `npm run build` because this changes frontend source, backend code, database schema, and the backend-served SPA output.
   - [ ] Manual/API smoke: purchase one manual row, open preview, confirm counts, complete, and confirm the purchased endpoint no longer returns it.
   - [ ] Manual/API smoke: purchase one recipe-derived row linked to at least one planned meal, complete, and confirm its provenance remains in the database with `archived_at` set.
   - [ ] Manual/API smoke: call completion twice and confirm the second response does not archive additional rows or duplicate cookbook-derived data.
   - [ ] Manual UI smoke at 360px and desktop-centered width: confirmation sheet content, pending state, disabled state, success toast, long labels, and bottom navigation do not overlap.
+
+### Review Findings
+
+- [x] [Review][Patch] Restore can race with completion and leave a row hidden from both active and purchased lists [backend/Controllers/HandlelisteController.cs:227]
+- [x] [Review][Patch] Delete can remove a row after it has been archived for cookbook history [backend/Controllers/HandlelisteController.cs:627]
+- [x] [Review][Patch] Completion confirm can proceed while a stale preview is refetching [frontend/app/routes/app/shop.tsx:653]
+- [x] [Review][Patch] Purchased tab has no disabled completion action when there are zero purchased rows [frontend/app/routes/app/shop.tsx:252]
+- [x] [Review][Patch] Archived-at migration is not rerunnable like earlier database migrations [database/v4_3_handleliste_archived_at.sql:3]
 
 ## Dev Notes
 
@@ -285,4 +293,28 @@ Ultimate context engine analysis completed - comprehensive developer guide creat
 
 ### Completion Notes List
 
+- Added `archived_at` via `database/v4_3_handleliste_archived_at.sql` and `schema.sql`; apply migration on existing DBs.
+- Preview: `GET /api/handleliste/completion-preview`; complete: `POST /api/handleliste/complete` (serializable tx; idempotent when nothing to archive).
+- Duplicate/active list logic ignores archived rows; delete/restore/purchase guard archived rows.
+- Frontend: `use-shopping-completion-preview`, `use-complete-shopping-trip`, confirmation `DetailSheet` on `/app/shop`.
+- Automated: `dotnet build` (alternate output; local `backend.exe` was locked), `npm run typecheck --prefix frontend`, root `npm run build`.
+- Review patches: restore/delete now use conditional write/delete guards for archived rows, completion confirm waits for preview refetches, purchased tab shows disabled completion when empty, and the archive migration is rerunnable.
+- Review verification: `npm run typecheck --prefix frontend`, `dotnet build backend/backend.csproj -o backend\bin-review`, and `npm run build`.
+- **Apply** `database/v4_3_handleliste_archived_at.sql` on your MySQL instance before testing.
+- Manual/API and UI checks under T7 remain for you after migration.
+
 ### File List
+
+- `database/v4_3_handleliste_archived_at.sql`
+- `database/schema.sql`
+- `backend/Models/HandlelisteRad.cs`
+- `backend/DTOs/ShoppingListDtos.cs`
+- `backend/Controllers/HandlelisteController.cs`
+- `frontend/app/features/shopping/types.ts`
+- `frontend/app/features/shopping/use-shopping-completion-preview.ts`
+- `frontend/app/features/shopping/use-complete-shopping-trip.ts`
+- `frontend/app/features/shopping/use-purchase-shopping-item.ts`
+- `frontend/app/features/shopping/use-restore-shopping-item.ts`
+- `frontend/app/routes/app/shop.tsx`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/4-3-purchase-completion-and-archiving.md`

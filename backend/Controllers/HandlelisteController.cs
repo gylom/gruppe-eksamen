@@ -29,7 +29,7 @@ public class HandlelisteController : ControllerBase
             return Ok(new ShoppingListGetResponse());
 
         var items = await _db.Handleliste
-            .Where(x => memberIds.Contains(x.UserId) && x.PurchasedAt == null)
+            .Where(x => memberIds.Contains(x.UserId) && x.PurchasedAt == null && x.ArchivedAt == null)
             .Include(x => x.Varetype)
             .Include(x => x.Vare)
             .Include(x => x.Maaleenhet)
@@ -104,7 +104,7 @@ public class HandlelisteController : ControllerBase
             return Ok(new ShoppingListPurchasedResponse());
 
         var items = await _db.Handleliste
-            .Where(x => memberIds.Contains(x.UserId) && x.PurchasedAt != null)
+            .Where(x => memberIds.Contains(x.UserId) && x.PurchasedAt != null && x.ArchivedAt == null)
             .Include(x => x.Varetype)
             .Include(x => x.Vare)
             .Include(x => x.Maaleenhet)
@@ -134,6 +134,52 @@ public class HandlelisteController : ControllerBase
         return Ok(new ShoppingListPurchasedResponse { Varer = items });
     }
 
+    [HttpGet("completion-preview")]
+    public async Task<IActionResult> GetCompletionPreview()
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var memberIds = await GetHouseholdMemberIds(userId.Value);
+        if (memberIds.Count == 0)
+        {
+            return Ok(new ShoppingListCompletionSummaryDto
+            {
+                ArchiveRowCount = 0,
+                CookbookMealCount = 0,
+                RemainingActiveRowCount = 0,
+                ArchivedAt = null,
+            });
+        }
+
+        var summary = await BuildCompletionSummaryAsync(memberIds, forWrite: false);
+        return Ok(summary);
+    }
+
+    [HttpPost("complete")]
+    public async Task<IActionResult> CompleteShopping()
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var memberIds = await GetHouseholdMemberIds(userId.Value);
+        if (memberIds.Count == 0)
+        {
+            return Ok(new ShoppingListCompletionSummaryDto
+            {
+                ArchiveRowCount = 0,
+                CookbookMealCount = 0,
+                RemainingActiveRowCount = 0,
+                ArchivedAt = null,
+            });
+        }
+
+        await using var tx = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        var summary = await BuildCompletionSummaryAsync(memberIds, forWrite: true);
+        await tx.CommitAsync();
+        return Ok(summary);
+    }
+
     [HttpPost("{id:long}/purchase")]
     public async Task<IActionResult> Purchase(long id)
     {
@@ -144,6 +190,9 @@ public class HandlelisteController : ControllerBase
         var memberIds = await GetHouseholdMemberIds(userId.Value);
         var row = await _db.Handleliste.FirstOrDefaultAsync(x => x.Id == (ulong)id && memberIds.Contains(x.UserId));
         if (row == null) return NotFound(new { message = "Handleliste-rad ikke funnet." });
+
+        if (row.ArchivedAt != null)
+            return Conflict(new { message = "Arkivert vare kan ikke markeres som kjøpt på nytt." });
 
         if (row.PurchasedAt != null)
         {
@@ -178,6 +227,9 @@ public class HandlelisteController : ControllerBase
         var row = await _db.Handleliste.FirstOrDefaultAsync(x => x.Id == (ulong)id && memberIds.Contains(x.UserId));
         if (row == null) return NotFound(new { message = "Handleliste-rad ikke funnet." });
 
+        if (row.ArchivedAt != null)
+            return Conflict(new { message = "Arkivert vare kan ikke gjenopprettes her." });
+
         if (row.PurchasedAt == null)
         {
             return Ok(new ShoppingListPurchaseRestoreResponse
@@ -193,13 +245,23 @@ public class HandlelisteController : ControllerBase
             x.Id != row.Id &&
             x.VaretypeId == row.VaretypeId &&
             x.MaaleenhetId == row.MaaleenhetId &&
-            x.PurchasedAt == null);
+            x.PurchasedAt == null &&
+            x.ArchivedAt == null);
         if (activeDuplicate)
             return Conflict(new { message = "Denne varen er allerede på handlelisten." });
 
-        row.PurchasedAt = null;
-        row.Endret = DateTime.UtcNow;
-        await _db.SaveChangesAsync();
+        var now = DateTime.UtcNow;
+        var restored = await _db.Handleliste
+            .Where(x =>
+                x.Id == row.Id &&
+                memberIds.Contains(x.UserId) &&
+                x.PurchasedAt != null &&
+                x.ArchivedAt == null)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.PurchasedAt, (DateTime?)null)
+                .SetProperty(x => x.Endret, now));
+        if (restored == 0)
+            return Conflict(new { message = "Arkivert vare kan ikke gjenopprettes her." });
 
         return Ok(new ShoppingListPurchaseRestoreResponse
         {
@@ -291,7 +353,8 @@ public class HandlelisteController : ControllerBase
             var alreadyOnList = await _db.Handleliste.AnyAsync(x =>
                 lockedMemberIds.Contains(x.UserId) &&
                 x.VaretypeId == key.VaretypeId &&
-                x.MaaleenhetId == key.MaaleenhetId);
+                x.MaaleenhetId == key.MaaleenhetId &&
+                x.ArchivedAt == null);
             if (alreadyOnList)
             {
                 skippedAlreadyOnListCount++;
@@ -376,7 +439,7 @@ public class HandlelisteController : ControllerBase
 
         var listKeySet = await _db.Handleliste
             .AsNoTracking()
-            .Where(x => memberIds.Contains(x.UserId))
+            .Where(x => memberIds.Contains(x.UserId) && x.ArchivedAt == null)
             .Select(x => new { x.VaretypeId, x.MaaleenhetId })
             .ToListAsync();
 
@@ -489,7 +552,8 @@ public class HandlelisteController : ControllerBase
         var duplicate = await _db.Handleliste.AnyAsync(x =>
             memberIds.Contains(x.UserId) &&
             x.VaretypeId == request.VaretypeId &&
-            x.MaaleenhetId == request.MaaleenhetId);
+            x.MaaleenhetId == request.MaaleenhetId &&
+            x.ArchivedAt == null);
         if (duplicate)
             return Conflict(new { message = "Denne varen er allerede på handlelisten." });
 
@@ -546,7 +610,8 @@ public class HandlelisteController : ControllerBase
             x.Id != row.Id &&
             x.VaretypeId == request.VaretypeId &&
             x.MaaleenhetId == request.MaaleenhetId &&
-            x.PurchasedAt == null);
+            x.PurchasedAt == null &&
+            x.ArchivedAt == null);
         if (keyTaken)
             return Conflict(new { message = "Denne varen er allerede på handlelisten." });
 
@@ -571,9 +636,67 @@ public class HandlelisteController : ControllerBase
         var row = await _db.Handleliste.FirstOrDefaultAsync(x => x.Id == (ulong)id && memberIds.Contains(x.UserId));
         if (row == null) return NotFound(new { message = "Handleliste-rad ikke funnet." });
 
-        _db.Handleliste.Remove(row);
-        await _db.SaveChangesAsync();
+        if (row.ArchivedAt != null)
+            return Conflict(new { message = "Arkivert handleliste-rad kan ikke slettes." });
+
+        var deleted = await _db.Handleliste
+            .Where(x => x.Id == row.Id && memberIds.Contains(x.UserId) && x.ArchivedAt == null)
+            .ExecuteDeleteAsync();
+        if (deleted == 0)
+            return Conflict(new { message = "Arkivert handleliste-rad kan ikke slettes." });
+
         return Ok(new { message = "Handleliste-rad slettet." });
+    }
+
+    private async Task<ShoppingListCompletionSummaryDto> BuildCompletionSummaryAsync(
+        List<ulong> memberIds,
+        bool forWrite)
+    {
+        var toArchive = await _db.Handleliste
+            .Where(x => memberIds.Contains(x.UserId) && x.PurchasedAt != null && x.ArchivedAt == null)
+            .Include(x => x.PlanlagteMaaltidLinker)
+            .ToListAsync();
+
+        var archiveRowCount = toArchive.Count;
+        var cookbookMealCount = CountDistinctCookbookMeals(toArchive);
+        DateTime? archivedAt = null;
+
+        if (forWrite && archiveRowCount > 0)
+        {
+            var utc = DateTime.UtcNow;
+            foreach (var row in toArchive)
+            {
+                row.ArchivedAt = utc;
+                row.Endret = utc;
+            }
+            await _db.SaveChangesAsync();
+            archivedAt = utc;
+        }
+
+        var remainingActiveRowCount = await _db.Handleliste.CountAsync(x =>
+            memberIds.Contains(x.UserId) && x.PurchasedAt == null && x.ArchivedAt == null);
+
+        return new ShoppingListCompletionSummaryDto
+        {
+            ArchiveRowCount = archiveRowCount,
+            CookbookMealCount = cookbookMealCount,
+            RemainingActiveRowCount = remainingActiveRowCount,
+            ArchivedAt = archivedAt,
+        };
+    }
+
+    private static int CountDistinctCookbookMeals(IEnumerable<HandlelisteRad> rows)
+    {
+        var ids = new HashSet<ulong>();
+        foreach (var row in rows)
+        {
+            if (row.Kilde != "plannedMeal") continue;
+            if (row.PlanlagtMaaltidId.HasValue)
+                ids.Add(row.PlanlagtMaaltidId.Value);
+            foreach (var link in row.PlanlagteMaaltidLinker)
+                ids.Add(link.PlanlagtMaaltidId);
+        }
+        return ids.Count;
     }
 
     private ulong? GetUserId()
