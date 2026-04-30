@@ -13,6 +13,72 @@ export type ShoppingSuggestionDto = {
   selectedByDefault: boolean
 }
 
+export type ActiveShoppingListRow = {
+  id: number
+  varetypeId: number
+  varetype: string
+  vareId: number | null
+  varenavn: string | null
+  kvantitet: number | null
+  maaleenhetId: number | null
+  maaleenhet: string | null
+  userId: number
+  brukernavn: string
+  kilde: string
+  planlagtMaaltidId: number | null
+  purchasedAt: string | null
+  opprettet: string | null
+  endret: string | null
+}
+
+export type ShoppingListStockSuggestion = {
+  varetypeId: number
+  varetype: string
+  forslagKvantitet: number
+  begrunnelse: string
+}
+
+export type ShoppingListGetResponse = {
+  varer: ActiveShoppingListRow[]
+  forslag: ShoppingListStockSuggestion[]
+}
+
+export type CreateShoppingItemBody = {
+  varetypeId: number
+  vareId?: number | null
+  kvantitet?: number | null
+  maaleenhetId?: number | null
+}
+
+export type UpdateShoppingItemBody = {
+  varetypeId: number
+  vareId: number | null
+  kvantitet: number | null
+  maaleenhetId: number | null
+}
+
+export type CreateShoppingItemResponse = {
+  message: string
+  id: number
+}
+
+export type UpdateShoppingItemResponse = {
+  message: string
+}
+
+export type VaretypeLookupRow = {
+  id: number
+  varetype: string
+  kategori_id: number | null
+  kategori: string
+}
+
+export type MaaleenhetLookupRow = {
+  id: number
+  enhet: string
+  type: string | null
+}
+
 export type GenerateShoppingSuggestionsResponse = {
   weekStartDate: string
   plannedMealCount: number

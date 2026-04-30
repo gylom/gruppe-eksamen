@@ -131,7 +131,6 @@ export default function ChefRoute() {
       </div>
 
       <div className="mt-5">
-        <p className="mb-2 text-xs font-medium text-muted-foreground">Måltidstype</p>
         <div
           className="flex flex-wrap gap-2"
           role="group"

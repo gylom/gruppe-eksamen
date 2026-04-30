@@ -8,12 +8,49 @@ public class CreateShoppingListItemRequest
     public ulong? MaaleenhetId { get; set; }
 }
 
+/// <summary>
+/// Full replacement of editable fields for a row. Server preserves <c>Kilde</c>, <c>PlanlagtMaaltidId</c>,
+/// and <c>HandlelistePlanlagteMaaltider</c> links.
+/// </summary>
 public class UpdateShoppingListItemRequest
 {
-    public ulong? VaretypeId { get; set; }
+    public ulong VaretypeId { get; set; }
     public ulong? VareId { get; set; }
     public decimal? Kvantitet { get; set; }
     public ulong? MaaleenhetId { get; set; }
+}
+
+public class ActiveShoppingListRowDto
+{
+    public ulong Id { get; set; }
+    public ulong VaretypeId { get; set; }
+    public string Varetype { get; set; } = string.Empty;
+    public ulong? VareId { get; set; }
+    public string? Varenavn { get; set; }
+    public decimal? Kvantitet { get; set; }
+    public ulong? MaaleenhetId { get; set; }
+    public string? Maaleenhet { get; set; }
+    public ulong UserId { get; set; }
+    public string Brukernavn { get; set; } = string.Empty;
+    public string Kilde { get; set; } = string.Empty;
+    public ulong? PlanlagtMaaltidId { get; set; }
+    public DateTime? PurchasedAt { get; set; }
+    public DateTime? Opprettet { get; set; }
+    public DateTime? Endret { get; set; }
+}
+
+public class ShoppingListStockSuggestionDto
+{
+    public ulong VaretypeId { get; set; }
+    public string Varetype { get; set; } = string.Empty;
+    public decimal ForslagKvantitet { get; set; }
+    public string Begrunnelse { get; set; } = string.Empty;
+}
+
+public class ShoppingListGetResponse
+{
+    public List<ActiveShoppingListRowDto> Varer { get; set; } = new();
+    public List<ShoppingListStockSuggestionDto> Forslag { get; set; } = new();
 }
 
 public class GenerateShoppingSuggestionsRequest

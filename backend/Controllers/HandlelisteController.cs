@@ -25,34 +25,38 @@ public class HandlelisteController : ControllerBase
         if (userId == null) return Unauthorized();
 
         var memberIds = await GetHouseholdMemberIds(userId.Value);
-        if (memberIds.Count == 0) return Ok(new { varer = Array.Empty<object>(), forslag = Array.Empty<object>() });
+        if (memberIds.Count == 0)
+            return Ok(new ShoppingListGetResponse());
 
         var items = await _db.Handleliste
-            .Where(x => memberIds.Contains(x.UserId))
+            .Where(x => memberIds.Contains(x.UserId) && x.PurchasedAt == null)
             .Include(x => x.Varetype)
             .Include(x => x.Vare)
             .Include(x => x.Maaleenhet)
             .Include(x => x.Bruker)
             .OrderByDescending(x => x.Endret ?? x.Opprettet)
-            .Select(x => new
+            .Select(x => new ActiveShoppingListRowDto
             {
-                id = x.Id,
-                varetypeId = x.VaretypeId,
-                varetype = x.Varetype!.Navn,
-                vareId = x.VareId,
-                varenavn = x.Vare != null ? x.Vare.Varenavn : null,
-                kvantitet = x.Kvantitet,
-                maaleenhetId = x.MaaleenhetId,
-                maaleenhet = x.Maaleenhet != null ? x.Maaleenhet.Enhet : null,
-                userId = x.UserId,
-                brukernavn = x.Bruker!.Brukernavn,
-                opprettet = x.Opprettet,
-                endret = x.Endret
+                Id = x.Id,
+                VaretypeId = x.VaretypeId,
+                Varetype = x.Varetype!.Navn,
+                VareId = x.VareId,
+                Varenavn = x.Vare != null ? x.Vare.Varenavn : null,
+                Kvantitet = x.Kvantitet,
+                MaaleenhetId = x.MaaleenhetId,
+                Maaleenhet = x.Maaleenhet != null ? x.Maaleenhet.Enhet : null,
+                UserId = x.UserId,
+                Brukernavn = x.Bruker!.Brukernavn,
+                Kilde = x.Kilde,
+                PlanlagtMaaltidId = x.PlanlagtMaaltidId,
+                PurchasedAt = x.PurchasedAt,
+                Opprettet = x.Opprettet,
+                Endret = x.Endret,
             })
             .ToListAsync();
 
         var householdId = await GetHouseholdId(userId.Value);
-        var forslag = new List<object>();
+        var forslag = new List<ShoppingListStockSuggestionDto>();
         if (householdId != null)
         {
             var settings = await _db.Husholdningsinnstillinger
@@ -76,17 +80,17 @@ public class HandlelisteController : ControllerBase
                     tilgjengelig = stockByType.FirstOrDefault(x => x.varetypeId == s.VaretypeId)?.total ?? 0,
                 })
                 .Where(x => x.tilgjengelig < x.minimumslager)
-                .Select(x => (object)new
+                .Select(x => new ShoppingListStockSuggestionDto
                 {
-                    varetypeId = x.varetypeId,
-                    varetype = x.varetype,
-                    forslagKvantitet = x.minimumslager - x.tilgjengelig,
-                    begrunnelse = "Under minimumslager"
+                    VaretypeId = x.varetypeId,
+                    Varetype = x.varetype,
+                    ForslagKvantitet = x.minimumslager - x.tilgjengelig,
+                    Begrunnelse = "Under minimumslager",
                 })
                 .ToList();
         }
 
-        return Ok(new { varer = items, forslag });
+        return Ok(new ShoppingListGetResponse { Varer = items, Forslag = forslag });
     }
 
     /// <summary>
@@ -340,14 +344,39 @@ public class HandlelisteController : ControllerBase
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
+        if (request.VaretypeId < 1) return BadRequest(new { message = "Varetype er påkrevd." });
+        if (request.Kvantitet.HasValue && request.Kvantitet.Value < 0)
+            return BadRequest(new { message = "Mengde kan ikke være negativ." });
+
         var varetypeExists = await _db.Varetyper.AnyAsync(x => x.Id == request.VaretypeId);
         if (!varetypeExists) return NotFound(new { message = "Varetype ikke funnet." });
 
-        var memberIds = await GetHouseholdMemberIds(userId.Value);
-        if (request.VareId.HasValue && !await _db.Varer.AnyAsync(x =>
-                x.Id == request.VareId.Value &&
-                (!x.Brukerdefinert || x.UserId == null || memberIds.Contains(x.UserId.Value))))
-            return NotFound(new { message = "Vare ikke funnet eller ikke tilgjengelig for husholdningen." });
+        if (request.MaaleenhetId.HasValue &&
+            !await _db.Maaleenheter.AnyAsync(x => x.Id == request.MaaleenhetId.Value))
+            return NotFound(new { message = "Måleenhet ikke funnet." });
+
+        var householdId = await GetHouseholdId(userId.Value);
+        if (householdId == null) return BadRequest(new { message = "Du er ikke medlem av en husholdning." });
+
+        await using var tx = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+
+        var lockedMembers = await _db.Medlemmer
+            .FromSqlInterpolated($"SELECT * FROM Medlemmer WHERE husholdning_id = {householdId.Value} FOR UPDATE")
+            .ToListAsync();
+        var memberIds = lockedMembers.Select(x => x.UserId).ToList();
+        if (memberIds.Count == 0) return BadRequest(new { message = "Du er ikke medlem av en husholdning." });
+
+        if (request.VareId.HasValue &&
+            !await IsVareAvailableForType(request.VareId.Value, request.VaretypeId, memberIds))
+            return NotFound(new { message = "Vare ikke funnet eller ikke tilgjengelig for valgt varetype." });
+
+        var duplicate = await _db.Handleliste.AnyAsync(x =>
+            memberIds.Contains(x.UserId) &&
+            x.VaretypeId == request.VaretypeId &&
+            x.MaaleenhetId == request.MaaleenhetId &&
+            x.PurchasedAt == null);
+        if (duplicate)
+            return Conflict(new { message = "Denne varen er allerede på handlelisten." });
 
         var row = new HandlelisteRad
         {
@@ -363,6 +392,7 @@ public class HandlelisteController : ControllerBase
 
         _db.Handleliste.Add(row);
         await _db.SaveChangesAsync();
+        await tx.CommitAsync();
         return Ok(new { message = "Vare lagt til i handleliste.", id = row.Id });
     }
 
@@ -373,15 +403,42 @@ public class HandlelisteController : ControllerBase
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
 
+        if (request.VaretypeId < 1) return BadRequest(new { message = "Varetype er påkrevd." });
+        if (request.Kvantitet.HasValue && request.Kvantitet.Value < 0)
+            return BadRequest(new { message = "Mengde kan ikke være negativ." });
+
+        var varetypeExists = await _db.Varetyper.AnyAsync(x => x.Id == request.VaretypeId);
+        if (!varetypeExists) return NotFound(new { message = "Varetype ikke funnet." });
+
+        if (request.MaaleenhetId.HasValue &&
+            !await _db.Maaleenheter.AnyAsync(x => x.Id == request.MaaleenhetId.Value))
+            return NotFound(new { message = "Måleenhet ikke funnet." });
+
         var memberIds = await GetHouseholdMemberIds(userId.Value);
         var row = await _db.Handleliste.Include(x => x.Bruker)
             .FirstOrDefaultAsync(x => x.Id == (ulong)id && memberIds.Contains(x.UserId));
         if (row == null) return NotFound(new { message = "Handleliste-rad ikke funnet." });
 
-        if (request.VaretypeId.HasValue) row.VaretypeId = request.VaretypeId.Value;
-        if (request.VareId.HasValue || request.VareId == null) row.VareId = request.VareId;
-        if (request.Kvantitet.HasValue) row.Kvantitet = request.Kvantitet.Value;
-        if (request.MaaleenhetId.HasValue || request.MaaleenhetId == null) row.MaaleenhetId = request.MaaleenhetId;
+        if (row.PurchasedAt != null)
+            return Conflict(new { message = "Kjøpt vare kan ikke redigeres her." });
+
+        if (request.VareId.HasValue &&
+            !await IsVareAvailableForType(request.VareId.Value, request.VaretypeId, memberIds))
+            return NotFound(new { message = "Vare ikke funnet eller ikke tilgjengelig for valgt varetype." });
+
+        var keyTaken = await _db.Handleliste.AnyAsync(x =>
+            memberIds.Contains(x.UserId) &&
+            x.Id != row.Id &&
+            x.VaretypeId == request.VaretypeId &&
+            x.MaaleenhetId == request.MaaleenhetId &&
+            x.PurchasedAt == null);
+        if (keyTaken)
+            return Conflict(new { message = "Denne varen er allerede på handlelisten." });
+
+        row.VaretypeId = request.VaretypeId;
+        row.VareId = request.VareId;
+        row.Kvantitet = request.Kvantitet;
+        row.MaaleenhetId = request.MaaleenhetId;
         row.Endret = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
@@ -420,6 +477,14 @@ public class HandlelisteController : ControllerBase
         var householdId = await GetHouseholdId(userId);
         if (householdId == null) return new List<ulong>();
         return await _db.Medlemmer.Where(x => x.HusholdningId == householdId.Value).Select(x => x.UserId).ToListAsync();
+    }
+
+    private async Task<bool> IsVareAvailableForType(ulong vareId, ulong varetypeId, List<ulong> memberIds)
+    {
+        return await _db.Varer.AnyAsync(x =>
+            x.Id == vareId &&
+            x.VaretypeId == varetypeId &&
+            (!x.Brukerdefinert || x.UserId == null || memberIds.Contains(x.UserId.Value)));
     }
 
     /// <summary>

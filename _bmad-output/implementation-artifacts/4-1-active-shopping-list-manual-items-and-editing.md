@@ -1,6 +1,6 @@
 # Story 4.1: Active Shopping List, Manual Items, and Editing
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -89,6 +89,13 @@ so that recipe-generated and ad hoc grocery needs live in one shared list.
   - [ ] Manual/API smoke: confirm suggestions from Plan, open Shop, and verify recipe-derived rows display with source metadata.
   - [ ] Manual/API smoke: add a manual item and verify it appears as manual for all household members.
   - [ ] Manual/API smoke: edit a recipe-derived row and verify its `kilde` and planned-meal links remain intact.
+
+### Review Findings
+
+- [x] [Review][Patch] Stale `vareId` can conflict with edited `varetypeId` and invalid item payloads are accepted [frontend/app/routes/app/shop.tsx:86, backend/Controllers/HandlelisteController.cs:417]
+- [x] [Review][Patch] Update payload type still allows omitted nullable fields despite the full-replacement contract [frontend/app/features/shopping/types.ts:53]
+- [x] [Review][Patch] Manual duplicate prevention can race under concurrent creates [backend/Controllers/HandlelisteController.cs:361]
+- [x] [Review][Patch] Quantity parsing accepts non-finite values that serialize as `null` [frontend/app/routes/app/shop.tsx:103]
 
 ## Dev Notes
 
