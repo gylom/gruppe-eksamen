@@ -1,6 +1,6 @@
 # Story 5.1: Cookbook History, Search, Sorting, and Re-Planning
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -42,54 +42,59 @@ so that the household can repeat meals that worked well.
 
 ## Tasks / Subtasks
 
-- [ ] **T1: Add cookbook DTOs and a derived backend read endpoint** (AC: 1, 2, 3)
-  - [ ] Add `backend/DTOs/CookbookDtos.cs` only if a separate DTO file keeps the contract clearer than extending `RecipeDtos.cs`.
-  - [ ] Add either a small `backend/Controllers/CookbookController.cs` at `/api/cookbook` or a narrow cookbook action in `OppskrifterController`; choose the smallest fit and keep routes under `/api/*`.
-  - [ ] Resolve the current user id from `ClaimTypes.NameIdentifier`; return 401 if it is missing.
-  - [ ] Resolve household membership server-side through `Medlemmer`; never accept household id from route, query string, request body, JWT household claims, or local storage.
-  - [ ] Query archived, purchased, recipe-derived shopping rows for the caller's household: `Handleliste.PurchasedAt != null`, `Handleliste.ArchivedAt != null`, and `Kilde == "plannedMeal"`.
-  - [ ] Include both direct `Handleliste.PlanlagtMaaltidId` and `HandlelistePlanlagteMaaltider.PlanlagtMaaltidId` links so aggregated shopping rows can contribute to every planned meal they came from.
-  - [ ] Join through `PlanlagteMaaltider`, `Oppskrifter`, and meal type/category data to return recipe name, recipe id, meal type, cooked count, and last cooked date.
-  - [ ] Join the current user's `Skjuloppskrift` preference for rating data used in Story 5.1 sorting. Do not implement rating mutation UI here; Story 5.2 owns rating writes.
-  - [ ] Do not create `Cookbook`, `CookbookHistory`, trip, pantry, analytics, or duplicate recipe-history tables.
+- [x] **T1: Add cookbook DTOs and a derived backend read endpoint** (AC: 1, 2, 3)
+  - [x] Add `backend/DTOs/CookbookDtos.cs` only if a separate DTO file keeps the contract clearer than extending `RecipeDtos.cs`.
+  - [x] Add either a small `backend/Controllers/CookbookController.cs` at `/api/cookbook` or a narrow cookbook action in `OppskrifterController`; choose the smallest fit and keep routes under `/api/*`.
+  - [x] Resolve the current user id from `ClaimTypes.NameIdentifier`; return 401 if it is missing.
+  - [x] Resolve household membership server-side through `Medlemmer`; never accept household id from route, query string, request body, JWT household claims, or local storage.
+  - [x] Query archived, purchased, recipe-derived shopping rows for the caller's household: `Handleliste.PurchasedAt != null`, `Handleliste.ArchivedAt != null`, and `Kilde == "plannedMeal"`.
+  - [x] Include both direct `Handleliste.PlanlagtMaaltidId` and `HandlelistePlanlagteMaaltider.PlanlagtMaaltidId` links so aggregated shopping rows can contribute to every planned meal they came from.
+  - [x] Join through `PlanlagteMaaltider`, `Oppskrifter`, and meal type/category data to return recipe name, recipe id, meal type, cooked count, and last cooked date.
+  - [x] Join the current user's `Skjuloppskrift` preference for rating data used in Story 5.1 sorting. Do not implement rating mutation UI here; Story 5.2 owns rating writes.
+  - [x] Do not create `Cookbook`, `CookbookHistory`, trip, pantry, analytics, or duplicate recipe-history tables.
 
-- [ ] **T2: Support search, meal-type filtering, and sorting in the API** (AC: 3)
-  - [ ] Accept narrow query params such as `search`, `mealTypeId`, and `sort`; use camelCase for new frontend-facing params.
-  - [ ] Search by recipe name and, if cheap with the existing query, meal type name. Keep search server-side so empty and filtered states reflect the source data.
-  - [ ] Filter by planning meal type ids used by the app (`1, 2, 3, 7, 8`) rather than unrelated recipe categories.
-  - [ ] Provide deterministic sorting options, at minimum recency and rating-aware recency. A practical default is current-user rating descending, then `lastCookedAt` descending, then recipe name.
-  - [ ] Return user-facing backend errors as `{ message = "..." }`; avoid adding a global API envelope.
+- [x] **T2: Support search, meal-type filtering, and sorting in the API** (AC: 3)
+  - [x] Accept narrow query params such as `search`, `mealTypeId`, and `sort`; use camelCase for new frontend-facing params.
+  - [x] Search by recipe name and, if cheap with the existing query, meal type name. Keep search server-side so empty and filtered states reflect the source data.
+  - [x] Filter by planning meal type ids used by the app (`1, 2, 3, 7, 8`) rather than unrelated recipe categories.
+  - [x] Provide deterministic sorting options, at minimum recency and rating-aware recency. A practical default is current-user rating descending, then `lastCookedAt` descending, then recipe name.
+  - [x] Return user-facing backend errors as `{ message = "..." }`; avoid adding a global API envelope.
 
-- [ ] **T3: Add cookbook frontend types and TanStack Query hook** (AC: 2, 3)
-  - [ ] Create `frontend/app/features/cookbook/types.ts` for the API DTOs.
-  - [ ] Create `frontend/app/features/cookbook/use-cookbook-history.ts` using `apiFetch`; do not call `fetch` directly.
-  - [ ] Use stable tuple query keys such as `["cookbook", filters]`; make filters serializable and stable.
-  - [ ] Preserve Story 4.3's invalidation target: completion already invalidates `["cookbook"]`, so the cookbook query key must share that prefix.
-  - [ ] Keep server state in TanStack Query and use local React state only for UI controls such as search text, selected filter, sort mode, and sheet visibility.
+- [x] **T3: Add cookbook frontend types and TanStack Query hook** (AC: 2, 3)
+  - [x] Create `frontend/app/features/cookbook/types.ts` for the API DTOs.
+  - [x] Create `frontend/app/features/cookbook/use-cookbook-history.ts` using `apiFetch`; do not call `fetch` directly.
+  - [x] Use stable tuple query keys such as `["cookbook", filters]`; make filters serializable and stable.
+  - [x] Preserve Story 4.3's invalidation target: completion already invalidates `["cookbook"]`, so the cookbook query key must share that prefix.
+  - [x] Keep server state in TanStack Query and use local React state only for UI controls such as search text, selected filter, sort mode, and sheet visibility.
 
-- [ ] **T4: Replace the `/app/book` placeholder with the cookbook UI** (AC: 2, 3, 5)
-  - [ ] Update `frontend/app/routes/app/book.tsx`; keep the route name and bottom-nav destination intact.
-  - [ ] Add compact search input, meal-type filter chips or segmented controls, and a sort control that works at 360px width.
-  - [ ] Render cookbook rows with recipe name, meal type, cooked count, last cooked date, and current user's rating state if available.
-  - [ ] Use text/icon state cues; do not rely on color alone for rating, empty, filtered, or loading states.
-  - [ ] Add localized loading, error/retry, empty, and no-results states. The empty state should guide the user toward planning/shopping completion, not generic recipe browsing.
-  - [ ] Keep the desktop view as the centered mobile app shell, not a dashboard.
+- [x] **T4: Replace the `/app/book` placeholder with the cookbook UI** (AC: 2, 3, 5)
+  - [x] Update `frontend/app/routes/app/book.tsx`; keep the route name and bottom-nav destination intact.
+  - [x] Add compact search input, meal-type filter chips or segmented controls, and a sort control that works at 360px width.
+  - [x] Render cookbook rows with recipe name, meal type, cooked count, last cooked date, and current user's rating state if available.
+  - [x] Use text/icon state cues; do not rely on color alone for rating, empty, filtered, or loading states.
+  - [x] Add localized loading, error/retry, empty, and no-results states. The empty state should guide the user toward planning/shopping completion, not generic recipe browsing.
+  - [x] Keep the desktop view as the centered mobile app shell, not a dashboard.
 
-- [ ] **T5: Reuse the existing add-to-plan flow for re-planning** (AC: 4)
-  - [ ] Reuse `DetailSheet` plus `AddToPlanPanel` from `frontend/app/features/planning/add-to-plan-panel.tsx`; do not create a second planning form.
-  - [ ] When a row's plan action is chosen, open the sheet with that recipe preselected and pass the recipe id and portions into `AddToPlanPanel`.
-  - [ ] If the cookbook endpoint does not include recipe portions, fetch recipe details through the existing recipe query before rendering `AddToPlanPanel`.
-  - [ ] On successful planning, toast concise feedback and invalidate only the affected `["planned-meals", weekStartDate]` query through the existing `useCreatePlannedMeal` hook.
-  - [ ] Preserve add-to-plan validation and conflict behavior from the planning endpoint, including 409 slot conflicts.
+- [x] **T5: Reuse the existing add-to-plan flow for re-planning** (AC: 4)
+  - [x] Reuse `DetailSheet` plus `AddToPlanPanel` from `frontend/app/features/planning/add-to-plan-panel.tsx`; do not create a second planning form.
+  - [x] When a row's plan action is chosen, open the sheet with that recipe preselected and pass the recipe id and portions into `AddToPlanPanel`.
+  - [x] If the cookbook endpoint does not include recipe portions, fetch recipe details through the existing recipe query before rendering `AddToPlanPanel`.
+  - [x] On successful planning, toast concise feedback and invalidate only the affected `["planned-meals", weekStartDate]` query through the existing `useCreatePlannedMeal` hook.
+  - [x] Preserve add-to-plan validation and conflict behavior from the planning endpoint, including 409 slot conflicts.
 
-- [ ] **T6: Verify backend and frontend behavior** (AC: 1, 2, 3, 4, 5)
-  - [ ] Run a backend build (`dotnet build backend/backend.csproj` or the established alternate output if `backend.exe` is locked).
-  - [ ] Run `npm run typecheck --prefix frontend`.
-  - [ ] Run the root `npm run build` if backend, frontend, or backend-served SPA output changes.
+- [x] **T6: Verify backend and frontend behavior** (AC: 1, 2, 3, 4, 5)
+  - [x] Run a backend build (`dotnet build backend/backend.csproj` or the established alternate output if `backend.exe` is locked).
+  - [x] Run `npm run typecheck --prefix frontend`.
+  - [x] Run the root `npm run build` if backend, frontend, or backend-served SPA output changes.
   - [ ] Manual/API smoke: complete a shopping trip with a recipe-derived row, call the cookbook endpoint, and confirm one row appears with the correct recipe, meal type, count, and last cooked date.
   - [ ] Manual/API smoke: complete a second trip for the same recipe and confirm `cookedCount` increments without a new table or duplicate row.
   - [ ] Manual/API smoke: verify another household cannot see the row.
   - [ ] Manual UI smoke at 360px and desktop-centered width: search, filters, sort, empty/no-results/error/loading states, and re-planning sheet do not overlap the bottom navigation or sticky controls.
+
+### Review Findings
+
+- [x] [Review][Patch] Hidden recipes can still appear in cookbook rows and fail re-planning [backend/Controllers/CookbookController.cs:97]
+- [x] [Review][Patch] Invalid meal type filters are ignored instead of narrowing or rejecting the request [backend/Controllers/CookbookController.cs:126]
 
 ## Dev Notes
 
@@ -289,4 +294,17 @@ Ultimate context engine analysis completed - comprehensive developer guide creat
 
 ### Completion Notes List
 
+- Implemented derived cookbook read model via `GET /api/cookbook` (household-scoped from `Medlemmer`, expands direct + `HandlelistePlanlagteMaaltider` links, groups by recipe + måltidstype, `lastCookedAt` from `ArchivedAt`).
+- Frontend: `useCookbookHistory` with query key prefix `["cookbook", …]` so shopping completion invalidation matches; `/app/book` uses search, måltid-filter (1,2,3,7,8), sort (Anbefalt / Nyeste), empty/no-results/error states, and `DetailSheet` + `AddToPlanPanel` for «Planlegg på nytt».
+- Verification: `npm run typecheck --prefix frontend` OK; root `npm run build` OK (SPA copied to `backend/wwwroot`). Full `dotnet build` failed locally only because `backend.exe` was locked by a running process; `dotnet msbuild … /t:CoreCompile` succeeded.
+- Manual/API smoke checks in T6 (trip completion, cross-household, 360px UI) remain for you when DB + server are available.
+
 ### File List
+
+- `backend/DTOs/CookbookDtos.cs`
+- `backend/Controllers/CookbookController.cs`
+- `frontend/app/features/cookbook/types.ts`
+- `frontend/app/features/cookbook/use-cookbook-history.ts`
+- `frontend/app/routes/app/book.tsx`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/5-1-cookbook-history-search-sorting-and-re-planning.md`

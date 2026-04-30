@@ -85,6 +85,9 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginRequest request)
     {
+        if (string.IsNullOrWhiteSpace(request.BrukernavnEllerEmail) || string.IsNullOrWhiteSpace(request.Passord))
+            return BadRequest(new { message = "Brukernavn/email og passord er pÃ¥krevd." });
+
         var identifier = request.BrukernavnEllerEmail.Trim();
         var bruker = await _db.Brukere.FirstOrDefaultAsync(x => x.Brukernavn == identifier || x.Email == identifier);
         if (bruker == null)

@@ -92,3 +92,19 @@ For multi-step tasks, state a brief plan:
 ```
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+## 5. Runtime Debugging Anti-Spiral
+
+**Verify the runtime before changing code. One hypothesis at a time.**
+
+When a local app suddenly returns 404/405/500, proxy errors, stale UI, or connection failures:
+
+- First identify what is actually running: check listening ports, process IDs, start times, and command/workspace paths.
+- Confirm the browser/dev server is using this repo, not an old checkout or sibling folder.
+- Probe the failing endpoint directly and through the frontend proxy; compare status codes before editing code.
+- Capture backend/frontend logs for the failing request before restarting repeatedly.
+- Restart only the stale or duplicate process you can name. Do not kill broad process groups unless the user asks.
+- After each restart, verify the expected route/port with a minimal request before trying the full UI again.
+- If two attempts do not move the error closer to a concrete cause, stop and summarize known facts, unknowns, and the next diagnostic step.
+
+The test: avoid "restart, retry, patch, retry" loops. A good debugging step should either confirm the active runtime, expose a concrete exception, or rule out one specific hypothesis.
