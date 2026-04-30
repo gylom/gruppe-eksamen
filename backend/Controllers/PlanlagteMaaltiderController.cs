@@ -305,8 +305,14 @@ public class PlanlagteMaaltiderController : ControllerBase
         if (meal == null)
             return NotFound(new { message = "Planlagt måltid ikke funnet." });
 
+        var linkedHandlelisteIds = await _db.HandlelistePlanlagteMaaltider
+            .Where(x => x.PlanlagtMaaltidId == meal.Id)
+            .Select(x => x.HandlelisteId)
+            .ToListAsync();
+
         var purchased = await _db.Handleliste.AnyAsync(h =>
-            h.PlanlagtMaaltidId == meal.Id && h.PurchasedAt != null);
+            h.PurchasedAt != null &&
+            (h.PlanlagtMaaltidId == meal.Id || linkedHandlelisteIds.Contains(h.Id)));
 
         if (purchased)
             return Conflict(new
@@ -318,7 +324,9 @@ public class PlanlagteMaaltiderController : ControllerBase
         await using var tx = await _db.Database.BeginTransactionAsync();
         try
         {
-            var linked = await _db.Handleliste.Where(h => h.PlanlagtMaaltidId == meal.Id).ToListAsync();
+            var linked = await _db.Handleliste
+                .Where(h => h.PlanlagtMaaltidId == meal.Id || linkedHandlelisteIds.Contains(h.Id))
+                .ToListAsync();
             _db.Handleliste.RemoveRange(linked);
             _db.PlanlagteMaaltider.Remove(meal);
             await _db.SaveChangesAsync();

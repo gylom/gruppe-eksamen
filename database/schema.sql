@@ -267,6 +267,7 @@ CREATE TABLE Handleliste (
     endret DATETIME,
     planlagt_maaltid_id BIGINT UNSIGNED NULL,
     purchased_at DATETIME NULL,
+    kilde VARCHAR(32) NOT NULL DEFAULT 'manual',
 
     KEY idx_handleliste_planlagt_maaltid (planlagt_maaltid_id),
 
@@ -275,6 +276,16 @@ CREATE TABLE Handleliste (
     FOREIGN KEY (user_id) REFERENCES Brukere(id),
     FOREIGN KEY (maaleenhet_id) REFERENCES Maaleenheter(id),
     FOREIGN KEY (planlagt_maaltid_id) REFERENCES PlanlagteMaaltider(id) ON DELETE SET NULL
+);
+
+CREATE TABLE HandlelistePlanlagteMaaltider (
+    handleliste_id BIGINT UNSIGNED NOT NULL,
+    planlagt_maaltid_id BIGINT UNSIGNED NOT NULL,
+
+    PRIMARY KEY (handleliste_id, planlagt_maaltid_id),
+
+    FOREIGN KEY (handleliste_id) REFERENCES Handleliste(id) ON DELETE CASCADE,
+    FOREIGN KEY (planlagt_maaltid_id) REFERENCES PlanlagteMaaltider(id) ON DELETE CASCADE
 );
 
 CREATE TABLE Skjuloppskrift (

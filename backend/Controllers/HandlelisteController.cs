@@ -4,6 +4,7 @@ using DefaultNamespace.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 using System.Globalization;
 using System.Security.Claims;
 
@@ -114,10 +115,125 @@ public class HandlelisteController : ControllerBase
         }
 
         var memberIds = await GetHouseholdMemberIds(userId.Value);
+        var generated = await BuildWeeklyShoppingSuggestionsAsync(householdId.Value, memberIds, monday);
+        return Ok(generated);
+    }
 
+    /// <summary>
+    /// Inserts selected server-regenerated suggestion rows into the active household shopping list.
+    /// </summary>
+    [HttpPost("confirm-suggestions")]
+    public async Task<IActionResult> ConfirmSuggestions([FromBody] ConfirmShoppingSuggestionsRequest? body)
+    {
+        var raw = body?.WeekStartDate?.Trim() ?? string.Empty;
+        if (!TryParseMonday(raw, out var monday))
+            return BadRequest(new { message = "weekStartDate må være en mandag i formatet YYYY-MM-DD." });
+
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var selectedClientIds = body?.SelectedClientIds ?? new List<string>();
+        if (selectedClientIds.Count == 0)
+            return BadRequest(new { message = "Velg minst én rad å legge til." });
+
+        var householdId = await GetHouseholdId(userId.Value);
+        if (householdId == null)
+            return BadRequest(new { message = "Du er ikke medlem av en husholdning." });
+
+        var memberIds = await GetHouseholdMemberIds(userId.Value);
+        var generated = await BuildWeeklyShoppingSuggestionsAsync(householdId.Value, memberIds, monday);
+
+        var byClientId = generated.Suggestions.ToDictionary(s => s.ClientId);
+        foreach (var clientId in selectedClientIds)
+        {
+            if (!byClientId.ContainsKey(clientId))
+            {
+                return Conflict(new { message = "Forslagene er utdaterte. Generer handleforslag på nytt." });
+            }
+        }
+
+        await using var tx = await _db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+
+        var lockedMembers = await _db.Medlemmer
+            .FromSqlInterpolated($"SELECT * FROM Medlemmer WHERE husholdning_id = {householdId.Value} FOR UPDATE")
+            .ToListAsync();
+        var lockedMemberIds = lockedMembers.Select(x => x.UserId).ToList();
+
+        var addedIds = new List<ulong>();
+        var skippedAlreadyOnListCount = 0;
+        var addedCount = 0;
+        var now = DateTime.UtcNow;
+
+        foreach (var clientId in selectedClientIds)
+        {
+            var sug = byClientId[clientId];
+            var key = (sug.VaretypeId, sug.MaaleenhetId);
+            var alreadyOnList = await _db.Handleliste.AnyAsync(x =>
+                lockedMemberIds.Contains(x.UserId) &&
+                x.VaretypeId == key.VaretypeId &&
+                x.MaaleenhetId == key.MaaleenhetId);
+            if (alreadyOnList)
+            {
+                skippedAlreadyOnListCount++;
+                continue;
+            }
+
+            ulong? firstMealId = sug.PlannedMealIds.Count > 0 ? sug.PlannedMealIds[0] : null;
+
+            var row = new HandlelisteRad
+            {
+                VaretypeId = sug.VaretypeId,
+                VareId = null,
+                UserId = userId.Value,
+                Kvantitet = sug.Kvantitet,
+                MaaleenhetId = sug.MaaleenhetId,
+                Opprettet = now,
+                Endret = now,
+                PlanlagtMaaltidId = firstMealId,
+                Kilde = "plannedMeal",
+            };
+
+            _db.Handleliste.Add(row);
+            await _db.SaveChangesAsync();
+
+            foreach (var pmId in sug.PlannedMealIds.OrderBy(id => id))
+            {
+                _db.HandlelistePlanlagteMaaltider.Add(new HandlelistePlanlagtMaaltidLink
+                {
+                    HandlelisteId = row.Id,
+                    PlanlagtMaaltidId = pmId,
+                });
+            }
+
+            await _db.SaveChangesAsync();
+
+            addedIds.Add(row.Id);
+            addedCount++;
+        }
+
+        await tx.CommitAsync();
+
+        return Ok(new ConfirmShoppingSuggestionsResponse
+        {
+            WeekStartDate = monday.ToString("yyyy-MM-dd"),
+            RequestedCount = selectedClientIds.Count,
+            AddedCount = addedCount,
+            SkippedAlreadyOnListCount = skippedAlreadyOnListCount,
+            AddedIds = addedIds,
+        });
+    }
+
+    /// <summary>
+    /// Shared server-side suggestion pipeline for generate-from-week and confirm-suggestions.
+    /// </summary>
+    private async Task<GenerateShoppingSuggestionsResponse> BuildWeeklyShoppingSuggestionsAsync(
+        ulong householdId,
+        List<ulong> memberIds,
+        DateOnly monday)
+    {
         var plannedMeals = await _db.PlanlagteMaaltider
             .AsNoTracking()
-            .Where(x => x.HusholdningId == householdId.Value && x.UkeStartDato == monday)
+            .Where(x => x.HusholdningId == householdId && x.UkeStartDato == monday)
             .Include(x => x.Oppskrift!)
             .ThenInclude(o => o.Ingredienser)
             .ThenInclude(i => i.Varetype)
@@ -148,7 +264,6 @@ public class HandlelisteController : ControllerBase
             .Select(x => (x.VaretypeId, x.MaaleenhetId))
             .ToHashSet();
 
-        // Aggregate by exact (varetypeId, maaleenhetId); null unit only matches null.
         var buckets = new Dictionary<(ulong Vt, ulong? Me), ShoppingSuggestionAccumulator>();
 
         foreach (var meal in plannedMeals)
@@ -211,12 +326,12 @@ public class HandlelisteController : ControllerBase
             .ThenBy(s => s.MaaleenhetId ?? ulong.MaxValue)
             .ToList();
 
-        return Ok(new GenerateShoppingSuggestionsResponse
+        return new GenerateShoppingSuggestionsResponse
         {
             WeekStartDate = monday.ToString("yyyy-MM-dd"),
             PlannedMealCount = plannedMeals.Count(m => m.Oppskrift != null),
             Suggestions = suggestions
-        });
+        };
     }
 
     [HttpPost]
@@ -242,7 +357,8 @@ public class HandlelisteController : ControllerBase
             Kvantitet = request.Kvantitet,
             MaaleenhetId = request.MaaleenhetId,
             Opprettet = DateTime.UtcNow,
-            Endret = DateTime.UtcNow
+            Endret = DateTime.UtcNow,
+            Kilde = "manual",
         };
 
         _db.Handleliste.Add(row);

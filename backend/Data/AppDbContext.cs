@@ -23,6 +23,7 @@ public class AppDbContext : DbContext
     public DbSet<Plassering> Plasseringer => Set<Plassering>();
     public DbSet<VarelagerRad> Varelager => Set<VarelagerRad>();
     public DbSet<HandlelisteRad> Handleliste => Set<HandlelisteRad>();
+    public DbSet<HandlelistePlanlagtMaaltidLink> HandlelistePlanlagteMaaltider => Set<HandlelistePlanlagtMaaltidLink>();
     public DbSet<ForbrukRad> Forbruk => Set<ForbrukRad>();
     public DbSet<Oppskrift> Oppskrifter => Set<Oppskrift>();
     public DbSet<Oppskriftskategori> Oppskriftskategorier => Set<Oppskriftskategori>();
@@ -307,5 +308,21 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(x => x.PlanlagtMaaltidId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<HandlelistePlanlagtMaaltidLink>()
+            .ToTable("HandlelistePlanlagteMaaltider")
+            .HasKey(x => new { x.HandlelisteId, x.PlanlagtMaaltidId });
+
+        modelBuilder.Entity<HandlelistePlanlagtMaaltidLink>()
+            .HasOne(x => x.Handleliste)
+            .WithMany(x => x.PlanlagteMaaltidLinker)
+            .HasForeignKey(x => x.HandlelisteId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<HandlelistePlanlagtMaaltidLink>()
+            .HasOne(x => x.PlanlagtMaaltid)
+            .WithMany()
+            .HasForeignKey(x => x.PlanlagtMaaltidId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

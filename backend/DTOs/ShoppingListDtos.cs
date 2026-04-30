@@ -49,3 +49,18 @@ public class ShoppingSuggestionDto
     public bool AlreadyOnList { get; set; }
     public bool SelectedByDefault { get; set; }
 }
+
+public class ConfirmShoppingSuggestionsRequest
+{
+    public string WeekStartDate { get; set; } = string.Empty;
+    public List<string> SelectedClientIds { get; set; } = new();
+}
+
+public class ConfirmShoppingSuggestionsResponse
+{
+    public string WeekStartDate { get; set; } = string.Empty;
+    public int RequestedCount { get; set; }
+    public int AddedCount { get; set; }
+    public int SkippedAlreadyOnListCount { get; set; }
+    public List<ulong> AddedIds { get; set; } = new();
+}

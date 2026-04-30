@@ -22,3 +22,16 @@ export type GenerateShoppingSuggestionsResponse = {
 export type GenerateShoppingSuggestionsBody = {
   weekStartDate: string
 }
+
+export type ConfirmShoppingSuggestionsBody = {
+  weekStartDate: string
+  selectedClientIds: string[]
+}
+
+export type ConfirmShoppingSuggestionsResponse = {
+  weekStartDate: string
+  requestedCount: number
+  addedCount: number
+  skippedAlreadyOnListCount: number
+  addedIds: number[]
+}

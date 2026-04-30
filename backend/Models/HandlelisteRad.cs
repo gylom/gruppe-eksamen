@@ -36,10 +36,17 @@ public class HandlelisteRad
     [Column("purchased_at")]
     public DateTime? PurchasedAt { get; set; }
 
+    /// <summary>e.g. manual, plannedMeal</summary>
+    [Column("kilde")]
+    public string Kilde { get; set; } = "manual";
+
     public Varetype? Varetype { get; set; }
     public Vare? Vare { get; set; }
     public Bruker? Bruker { get; set; }
     public Maaleenhet? Maaleenhet { get; set; }
 
     public PlanlagtMaaltid? PlanlagtMaaltid { get; set; }
+
+    public ICollection<HandlelistePlanlagtMaaltidLink> PlanlagteMaaltidLinker { get; set; } =
+        new List<HandlelistePlanlagtMaaltidLink>();
 }

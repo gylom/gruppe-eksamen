@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, ListChecks } from "lucide-react"
 import { Link } from "react-router"
 import { toast } from "sonner"
 
 import { SwipeActionRow } from "~/components/SwipeActionRow"
 import { DetailSheet } from "~/components/detail-sheet"
 import { Button, buttonVariants } from "~/components/ui/button"
+import { Checkbox } from "~/components/ui/checkbox"
 import { Label } from "~/components/ui/label"
 import {
   PLANNING_MEAL_FALLBACK_NAVN,
@@ -22,6 +23,8 @@ import {
   useUpdatePlannedMealServings,
 } from "~/features/planning/use-planned-meals"
 import { useRecipeCategories } from "~/features/recipes/use-recipes"
+import type { GenerateShoppingSuggestionsResponse, ShoppingSuggestionDto } from "~/features/shopping/types"
+import { useConfirmShoppingSuggestions } from "~/features/shopping/use-confirm-shopping-suggestions"
 import { useGenerateShoppingSuggestions } from "~/features/shopping/use-shopping-suggestions"
 import { ApiError } from "~/lib/api-fetch"
 import {
@@ -37,6 +40,19 @@ const EDIT_FORM_ID = "plan-edit-servings-form"
 
 function clampServings(n: number): number {
   return Math.min(20, Math.max(1, Math.round(n)))
+}
+
+function formatSuggestionQtyLine(s: ShoppingSuggestionDto): string {
+  if (s.kvantitet == null) return ""
+  const qty = String(s.kvantitet).replace(/\.00$/, "").replace(/(\.\d*?)0+$/, "$1")
+  const unit = (s.maaleenhet ?? "").trim()
+  return [qty, unit].filter(Boolean).join(" ")
+}
+
+function suggestionCheckboxAriaLabel(s: ShoppingSuggestionDto): string {
+  const qtyPart = formatSuggestionQtyLine(s)
+  const head = qtyPart ? `${qtyPart} ${s.varetype}` : s.varetype
+  return s.alreadyOnList ? `${head}. Allerede på handleliste.` : head
 }
 
 function formatIngredientLine(ing: PlannedMealIngredientDto): string {
@@ -59,12 +75,17 @@ export default function PlanRoute() {
   const restoreIngredientMutation = useRestorePlannedMealIngredient()
   const deletePlannedMealMutation = useDeletePlannedMeal()
   const generateShoppingSuggestions = useGenerateShoppingSuggestions()
+  const confirmShoppingSuggestions = useConfirmShoppingSuggestions()
 
   const [editingMeal, setEditingMeal] = useState<PlannedMealDto | null>(null)
   const [editServingsValue, setEditServingsValue] = useState(4)
   const [editError, setEditError] = useState<string | null>(null)
   const [sheetStep, setSheetStep] = useState<"edit" | "confirmRemove">("edit")
   const [deleteProtectedReason, setDeleteProtectedReason] = useState<string | null>(null)
+
+  const [suggestionReviewOpen, setSuggestionReviewOpen] = useState(false)
+  const [suggestionReview, setSuggestionReview] = useState<GenerateShoppingSuggestionsResponse | null>(null)
+  const [selectedSuggestionIds, setSelectedSuggestionIds] = useState<Set<string>>(() => new Set())
 
   const planningCategories = useMemo(() => {
     const raw = categoriesQuery.data ?? []
@@ -165,13 +186,66 @@ export default function PlanRoute() {
   async function runGenerateShoppingSuggestions() {
     try {
       const res = await generateShoppingSuggestions.mutateAsync({ weekStartDate: weekMonday })
-      toast.success(
-        `${res.suggestions.length} handleforslag fra ${res.plannedMealCount} måltid${res.plannedMealCount === 1 ? "" : "er"} (uke ${res.weekStartDate} — kun forslag, ikke lagret).`,
-      )
+      const initial = new Set(res.suggestions.filter((s) => s.selectedByDefault).map((s) => s.clientId))
+      setSelectedSuggestionIds(initial)
+      setSuggestionReview(res)
+      setSuggestionReviewOpen(true)
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Kunne ikke generere forslag."
       toast.error(msg)
     }
+  }
+
+  async function submitConfirmedSuggestions() {
+    if (!suggestionReview) return
+    const ids = suggestionReview.suggestions
+      .filter((s) => selectedSuggestionIds.has(s.clientId))
+      .map((s) => s.clientId)
+    if (ids.length === 0) return
+    try {
+      const res = await confirmShoppingSuggestions.mutateAsync({
+        weekStartDate: suggestionReview.weekStartDate,
+        selectedClientIds: ids,
+      })
+      const skipped = res.skippedAlreadyOnListCount
+      if (res.addedCount > 0) {
+        toast.success(
+          res.addedCount === 1 ? "La til 1 vare i handlelisten." : `La til ${res.addedCount} varer i handlelisten.`,
+          skipped > 0
+            ? {
+                description:
+                  skipped === 1
+                    ? "1 rad var allerede på listen og ble ikke lagt til på nytt."
+                    : `${skipped} rader var allerede på listen og ble ikke lagt til på nytt.`,
+              }
+            : undefined,
+        )
+      } else if (skipped > 0) {
+        toast.success("Ingen nye varer ble lagt til.", {
+          description:
+            skipped === 1
+              ? "Den valgte raden var allerede på handlelisten."
+              : "Alle valgte rader var allerede på handlelisten.",
+        })
+      } else {
+        toast.success("Ingen endringer.")
+      }
+      setSuggestionReviewOpen(false)
+      setSuggestionReview(null)
+      setSelectedSuggestionIds(new Set())
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Kunne ikke legge til på handlelisten."
+      toast.error(msg)
+    }
+  }
+
+  function toggleSuggestionSelected(clientId: string, checked: boolean) {
+    setSelectedSuggestionIds((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(clientId)
+      else next.delete(clientId)
+      return next
+    })
   }
 
   async function confirmRemovePlannedMeal() {
@@ -195,7 +269,10 @@ export default function PlanRoute() {
   }
 
   const editTitleId = "plan-edit-meal-title"
+  const suggestionTitleId = "plan-shopping-suggestions-title"
   const ingredients = editingMeal?.ingredients ?? []
+
+  const selectedSuggestionCount = selectedSuggestionIds.size
 
   return (
     <section className="p-4 pb-28" aria-labelledby="plan-heading">
@@ -528,6 +605,103 @@ export default function PlanRoute() {
                 {deleteProtectedReason}
               </p>
             ) : null}
+          </div>
+        ) : null}
+      </DetailSheet>
+
+      <DetailSheet
+        open={suggestionReviewOpen}
+        onOpenChange={(open) => {
+          setSuggestionReviewOpen(open)
+          if (!open) {
+            setSuggestionReview(null)
+            setSelectedSuggestionIds(new Set())
+          }
+        }}
+        labelledById={suggestionTitleId}
+        title="Gjennomgå handleforslag"
+        description={
+          suggestionReview
+            ? `${formatWeekRangeTitleNb(suggestionReview.weekStartDate)} · ${suggestionReview.plannedMealCount} planlagte måltid${suggestionReview.plannedMealCount === 1 ? "" : "er"} · ${suggestionReview.suggestions.length} rader`
+            : undefined
+        }
+        footer={
+          suggestionReview ? (
+            <div className="flex w-full flex-col gap-2">
+              {selectedSuggestionCount === 0 ? (
+                <p className="text-center text-xs text-muted-foreground">
+                  Velg minst én rad for å legge til i handlelisten.
+                </p>
+              ) : null}
+              <Button
+                type="button"
+                className="w-full"
+                disabled={
+                  selectedSuggestionCount === 0 ||
+                  confirmShoppingSuggestions.isPending ||
+                  generateShoppingSuggestions.isPending
+                }
+                aria-busy={confirmShoppingSuggestions.isPending}
+                onClick={() => void submitConfirmedSuggestions()}
+              >
+                {confirmShoppingSuggestions.isPending
+                  ? "Legger til…"
+                  : `Legg til ${selectedSuggestionCount} ${selectedSuggestionCount === 1 ? "vare" : "varer"}`}
+              </Button>
+            </div>
+          ) : null
+        }
+      >
+        {suggestionReview ? (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Kun merkede rader legges til. Vi slår opp mengder og måltidskoblinger på nytt på serveren når du bekrefter.
+            </p>
+            <ul className="space-y-2">
+              {suggestionReview.suggestions.map((s, idx) => (
+                <li key={s.clientId}>
+                  <label
+                    htmlFor={`plan-suggestion-${idx}`}
+                    className={cn(
+                      "flex cursor-pointer gap-3 rounded-xl border border-border bg-card p-3 shadow-sm transition-colors hover:bg-muted/40",
+                      s.alreadyOnList ? "border-dashed" : "",
+                    )}
+                  >
+                    <Checkbox
+                      id={`plan-suggestion-${idx}`}
+                      className="mt-1 shrink-0"
+                      checked={selectedSuggestionIds.has(s.clientId)}
+                      onCheckedChange={(next) =>
+                        toggleSuggestionSelected(s.clientId, next === true)
+                      }
+                      aria-label={suggestionCheckboxAriaLabel(s)}
+                    />
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
+                        <span className="text-sm font-medium leading-snug text-foreground">{s.varetype}</span>
+                        {s.alreadyOnList ? (
+                          <span className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/80 px-1.5 py-0.5 text-xs font-medium text-foreground">
+                            <ListChecks className="size-3.5 shrink-0" aria-hidden />
+                            Allerede på handleliste
+                          </span>
+                        ) : null}
+                      </div>
+                      {s.kvantitet != null ? (
+                        <p className="text-xs tabular-nums text-muted-foreground">{formatSuggestionQtyLine(s)}</p>
+                      ) : (
+                        <p className="text-xs font-medium text-amber-900 dark:text-amber-200">
+                          Ingen mengde i oppskriften — huk av om du vil ha med som påminnelse
+                        </p>
+                      )}
+                      <p className="text-[11px] leading-snug text-muted-foreground">
+                        {s.sourceCount} ingredienslinjer · {s.plannedMealIds.length}{" "}
+                        {s.plannedMealIds.length === 1 ? "måltid" : "måltider"}
+                      </p>
+                    </div>
+                  </label>
+                </li>
+              ))}
+            </ul>
           </div>
         ) : null}
       </DetailSheet>
