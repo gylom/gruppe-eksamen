@@ -30,8 +30,16 @@ public class HandlelisteRad
     [Column("endret")]
     public DateTime? Endret { get; set; }
 
+    [Column("planlagt_maaltid_id")]
+    public ulong? PlanlagtMaaltidId { get; set; }
+
+    [Column("purchased_at")]
+    public DateTime? PurchasedAt { get; set; }
+
     public Varetype? Varetype { get; set; }
     public Vare? Vare { get; set; }
     public Bruker? Bruker { get; set; }
     public Maaleenhet? Maaleenhet { get; set; }
+
+    public PlanlagtMaaltid? PlanlagtMaaltid { get; set; }
 }

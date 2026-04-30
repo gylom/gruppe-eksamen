@@ -14,6 +14,7 @@ import { queryClient } from "~/lib/query-client"
 
 import type { Route } from "./+types/root"
 import "./app.css"
+import "react-swipeable-list/dist/styles.css"
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (

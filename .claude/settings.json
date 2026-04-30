@@ -1,0 +1,44 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 \"c:/Users/PaalA/Documents/school dev/gruppeeksamen_v2/gruppe-eksamen/_bmad/scripts/resolve_customization.py\" --skill \"c:/Users/PaalA/Documents/school dev/gruppeeksamen_v2/gruppe-eksamen/.claude/skills/bmad-sprint-planning\" --key workflow)",
+      "Bash(python3 \"c:/Users/PaalA/Documents/school dev/gruppeeksamen_v2/gruppe-eksamen/_bmad/scripts/resolve_customization.py\" --skill \"c:/Users/PaalA/Documents/school dev/gruppeeksamen_v2/gruppe-eksamen/.claude/skills/bmad-sprint-planning\" --key workflow.on_complete)",
+      "Bash(python3 \"c:/Users/PaalA/Documents/school dev/gruppeeksamen_v2/gruppe-eksamen/.claude/skills/bmad-create-story/scripts/resolve_customization.py\" --skill \"c:/Users/PaalA/Documents/school dev/gruppeeksamen_v2/gruppe-eksamen/.claude/skills/bmad-create-story\" --key workflow)",
+      "Bash(python3 \"c:/Users/PaalA/Documents/school dev/gruppeeksamen_v2/gruppe-eksamen/_bmad/scripts/resolve_customization.py\" --skill \"c:/Users/PaalA/Documents/school dev/gruppeeksamen_v2/gruppe-eksamen/.claude/skills/bmad-create-story\" --key workflow)",
+      "Bash(git -C \"c:/Users/PaalA/Documents/school dev/gruppeeksamen_v2/gruppe-eksamen\" log --oneline -10)",
+      "Bash(git -C \"c:/Users/PaalA/Documents/school dev/gruppeeksamen_v2/gruppe-eksamen\" diff --stat HEAD~3..HEAD)",
+      "Bash(python3 \"c:/Users/PaalA/Documents/school dev/gruppeeksamen_v2/gruppe-eksamen/.claude/skills/bmad-dev-story/customize.toml\")",
+      "Bash(python3 \"c:/Users/PaalA/Documents/school dev/gruppeeksamen_v2/gruppe-eksamen/_bmad/scripts/resolve_customization.py\" --skill \"c:/Users/PaalA/Documents/school dev/gruppeeksamen_v2/gruppe-eksamen/.claude/skills/bmad-dev-story\" --key workflow)",
+      "Bash(dotnet run *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5188/)",
+      "Bash(curl -s -o /tmp/root_body.html -w \"status=%{http_code} content-type=%{content_type}\\\\n\" http://localhost:5188/)",
+      "Bash(curl -s -o /tmp/asset_body.txt -w \"status=%{http_code} content-type=%{content_type} size=%{size_download}\\\\n\" http://localhost:5188/assets/entry.client-CEf5XKd0.js)",
+      "Bash(curl -s -o /tmp/fallback_body.html -w \"status=%{http_code} content-type=%{content_type}\\\\n\" http://localhost:5188/app/chef)",
+      "Bash(curl -s -o /tmp/api_body.txt -w \"status=%{http_code} content-type=%{content_type}\\\\n\" http://localhost:5188/api/oppskrifter)",
+      "Bash(taskkill //F //PID 4572)",
+      "Bash(tasklist)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5188/api/oppskrifter)",
+      "Bash(curl -s -o /tmp/r1.html -w \"status=%{http_code} content-type=%{content_type}\\\\n\" http://localhost:5188/)",
+      "Bash(curl -s -o /tmp/r2.txt -w \"status=%{http_code} content-type=%{content_type} size=%{size_download}\\\\n\" http://localhost:5188/assets/entry.client-CEf5XKd0.js)",
+      "Bash(curl -s -o /tmp/r3.html -w \"status=%{http_code} content-type=%{content_type}\\\\n\" http://localhost:5188/app/chef)",
+      "Bash(curl -s -o /tmp/r4.txt -w \"status=%{http_code} content-type=%{content_type}\\\\n\" http://localhost:5188/api/oppskrifter)",
+      "Bash(python3 \"c:/Users/PaalA/Documents/school dev/gruppeeksamen_v2/gruppe-eksamen/_bmad/scripts/resolve_customization.py\" --skill \"c:/Users/PaalA/Documents/school dev/gruppeeksamen_v2/gruppe-eksamen/.claude/skills/bmad-dev-story\" --key workflow.on_complete)",
+      "Bash(dotnet build *)",
+      "Bash(npm install *)",
+      "Bash(npx shadcn@latest add button input label form sonner --overwrite)",
+      "Bash(npx shadcn@latest add form --overwrite)",
+      "Bash(npx shadcn@latest add form --overwrite --yes)",
+      "Bash(npx shadcn@latest view form)",
+      "Bash(pnpm exec *)",
+      "Bash(git push *)",
+      "Bash(python3 \"c:/Users/PaalA/Documents/school dev/gruppeeksamen_v2/gruppe-eksamen/_bmad/scripts/resolve_customization.py\" --skill \"c:/Users/PaalA/Documents/school dev/gruppeeksamen_v2/gruppe-eksamen/.claude/skills/bmad-code-review\" --key workflow)",
+      "Bash(git fetch *)",
+      "Bash(git merge *)",
+      "Bash(git branch *)",
+      "WebFetch(domain:uselayouts.com)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  }
+}

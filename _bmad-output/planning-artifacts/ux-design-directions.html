@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ChopChopShop UX Design Directions</title>
+  <style>
+    :root {
+      --paper: #f7f1e8;
+      --paper-2: #efe4d6;
+      --ink: #302721;
+      --muted: #7a6b5e;
+      --line: #d8c8b7;
+      --terracotta: #b86f52;
+      --terracotta-strong: #9e573d;
+      --sage: #7c9473;
+      --amber: #c18b3a;
+      --danger: #b75a50;
+      --shadow: 0 18px 45px rgba(60, 43, 30, 0.14);
+      --radius: 8px;
+      color-scheme: light;
+      font-family: "Segoe UI", "Aptos", system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(135deg, rgba(184, 111, 82, 0.08), transparent 34%),
+        linear-gradient(180deg, #fbf7f0, var(--paper));
+      color: var(--ink);
+      letter-spacing: 0;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .page {
+      min-height: 100vh;
+      padding: 32px 20px 56px;
+    }
+
+    .shell {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
+      gap: 24px;
+      align-items: end;
+      margin-bottom: 22px;
+    }
+
+    .eyebrow {
+      color: var(--terracotta-strong);
+      font-weight: 700;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 760px;
+      font-size: clamp(2rem, 5vw, 4.9rem);
+      line-height: 0.98;
+      font-weight: 780;
+      letter-spacing: 0;
+    }
+
+    .hero p {
+      max-width: 590px;
+      margin: 16px 0 0;
+      color: var(--muted);
+      font-size: 1.02rem;
+      line-height: 1.55;
+    }
+
+    .meta {
+      display: grid;
+      gap: 8px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      background: rgba(255, 252, 247, 0.78);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+    }
+
+    .meta strong {
+      font-size: 0.84rem;
+    }
+
+    .meta span {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 12px 0 16px;
+      margin-bottom: 16px;
+      background: linear-gradient(180deg, rgba(251, 247, 240, 0.96), rgba(251, 247, 240, 0.78));
+      backdrop-filter: blur(10px);
+    }
+
+    .tab {
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: rgba(255, 252, 247, 0.78);
+      border-radius: 999px;
+      padding: 9px 13px;
+      min-height: 40px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .tab[aria-selected="true"] {
+      background: var(--terracotta);
+      color: #fff8f1;
+      border-color: var(--terracotta);
+    }
+
+    .directions {
+      display: grid;
+      gap: 22px;
+    }
+
+    .direction {
+      display: none;
+      grid-template-columns: minmax(280px, 0.72fr) minmax(320px, 1fr);
+      gap: 22px;
+      align-items: stretch;
+    }
+
+    .direction.is-active {
+      display: grid;
+      animation: rise 280ms ease both;
+    }
+
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .brief,
+    .mock-stage {
+      border: 1px solid var(--line);
+      background: rgba(255, 252, 247, 0.82);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .brief {
+      padding: 20px;
+    }
+
+    .brief h2 {
+      margin: 0 0 8px;
+      font-size: clamp(1.5rem, 3vw, 2.35rem);
+      line-height: 1.06;
+      letter-spacing: 0;
+    }
+
+    .brief p {
+      color: var(--muted);
+      line-height: 1.55;
+      margin: 0 0 16px;
+    }
+
+    .chips,
+    .swatches {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 16px 0;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      background: var(--paper);
+      border-radius: 999px;
+      padding: 7px 10px;
+      color: var(--ink);
+      font-size: 0.84rem;
+    }
+
+    .swatch {
+      width: 46px;
+      height: 32px;
+      border: 1px solid rgba(48, 39, 33, 0.16);
+      border-radius: 6px;
+    }
+
+    .notes {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 0.94rem;
+    }
+
+    .mock-stage {
+      display: grid;
+      place-items: center;
+      min-height: 720px;
+      padding: 22px;
+      overflow: hidden;
+    }
+
+    .phone {
+      width: min(390px, 100%);
+      min-height: 690px;
+      border-radius: 30px;
+      padding: 14px;
+      background: #1d1713;
+      box-shadow: 0 22px 70px rgba(48, 39, 33, 0.28);
+    }
+
+    .screen {
+      min-height: 662px;
+      border-radius: 22px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: var(--paper);
+      color: var(--ink);
+    }
+
+    .status {
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 10px;
+    }
+
+    .app-title {
+      font-size: 1.45rem;
+      font-weight: 780;
+      letter-spacing: 0;
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      background: var(--terracotta);
+      color: #fff7ef;
+      font-weight: 780;
+      font-size: 0.82rem;
+    }
+
+    .content {
+      flex: 1;
+      padding: 0 16px 12px;
+      overflow: hidden;
+    }
+
+    .search {
+      height: 42px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.45);
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .segmented {
+      display: flex;
+      gap: 6px;
+      margin: 12px 0;
+      overflow: hidden;
+    }
+
+    .pill {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.34);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    .pill.active {
+      background: var(--terracotta);
+      border-color: var(--terracotta);
+      color: #fff8f1;
+    }
+
+    .list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .row,
+    .recipe-card,
+    .day-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 252, 247, 0.72);
+      padding: 12px;
+    }
+
+    .row {
+      min-height: 62px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      transition: transform 160ms ease, background 160ms ease;
+    }
+
+    .row:hover {
+      transform: translateX(5px);
+      background: rgba(255, 252, 247, 0.94);
+    }
+
+    .row strong,
+    .day-card strong,
+    .recipe-card strong {
+      display: block;
+      font-size: 0.96rem;
+      margin-bottom: 3px;
+    }
+
+    .row small,
+    .day-card small,
+    .recipe-card small {
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .tag {
+      border: 1px solid rgba(48, 39, 33, 0.14);
+      border-radius: 999px;
+      padding: 5px 8px;
+      font-size: 0.72rem;
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.5);
+      white-space: nowrap;
+    }
+
+    .tag.good {
+      color: #2e4b33;
+      background: rgba(124, 148, 115, 0.18);
+      border-color: rgba(124, 148, 115, 0.34);
+    }
+
+    .tag.warn {
+      color: #684a18;
+      background: rgba(193, 139, 58, 0.16);
+      border-color: rgba(193, 139, 58, 0.34);
+    }
+
+    .cta {
+      min-height: 46px;
+      border: 0;
+      border-radius: var(--radius);
+      background: var(--terracotta);
+      color: #fff8f1;
+      font-weight: 760;
+      width: 100%;
+      cursor: pointer;
+      box-shadow: 0 10px 18px rgba(184, 111, 82, 0.2);
+    }
+
+    .bottom-nav {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 4px;
+      padding: 8px 10px 12px;
+      border-top: 1px solid var(--line);
+      background: rgba(255, 252, 247, 0.86);
+    }
+
+    .nav-item {
+      min-height: 44px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-size: 0.72rem;
+      border-radius: 8px;
+    }
+
+    .nav-item.active {
+      color: var(--terracotta-strong);
+      background: rgba(184, 111, 82, 0.12);
+      font-weight: 750;
+    }
+
+    .d1 .screen {
+      --paper: #f7f1e8;
+      --ink: #302721;
+      --muted: #76675a;
+      --line: #d8c8b7;
+      --terracotta: #b86f52;
+      --terracotta-strong: #9e573d;
+      background: linear-gradient(180deg, #fbf6ee, #f3e8da);
+    }
+
+    .d1 .content {
+      display: grid;
+      gap: 12px;
+    }
+
+    .week-strip {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 10px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 0.88rem;
+      padding: 10px 0;
+    }
+
+    .d2 .screen {
+      --paper: #faf5ed;
+      --ink: #2f2a24;
+      --muted: #72675c;
+      --line: #d6c6b4;
+      --terracotta: #7c9473;
+      --terracotta-strong: #587452;
+      background: #faf5ed;
+    }
+
+    .aisle {
+      color: var(--terracotta-strong);
+      font-size: 0.76rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      margin: 14px 0 6px;
+    }
+
+    .d2 .row {
+      grid-template-columns: 34px 1fr auto;
+    }
+
+    .check {
+      width: 28px;
+      height: 28px;
+      border: 2px solid var(--sage);
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      color: var(--sage);
+      font-weight: 800;
+    }
+
+    .d3 .screen {
+      --paper: #fff8ea;
+      --ink: #342a21;
+      --muted: #7f6855;
+      --line: #dec8a9;
+      --terracotta: #c18b3a;
+      --terracotta-strong: #9c681f;
+      background:
+        linear-gradient(#f1dfbd 1px, transparent 1px) 0 74px / 100% 46px,
+        #fff8ea;
+    }
+
+    .d3 .day-card {
+      background: rgba(255, 251, 241, 0.84);
+    }
+
+    .d4 .screen {
+      --paper: #211b17;
+      --ink: #f5eee5;
+      --muted: #bba99a;
+      --line: #4a3b32;
+      --terracotta: #c27a5c;
+      --terracotta-strong: #f0ad87;
+      background: #211b17;
+    }
+
+    .d4 .row,
+    .d4 .search,
+    .d4 .bottom-nav {
+      background: #2c241f;
+    }
+
+    .d4 .tag {
+      background: #3a3029;
+      color: var(--ink);
+      border-color: #5d4b40;
+    }
+
+    .d5 .screen {
+      --paper: #f5efe7;
+      --ink: #28231f;
+      --muted: #71675d;
+      --line: #d1c2b2;
+      --terracotta: #b86f52;
+      --terracotta-strong: #8f513b;
+      background: #f5efe7;
+    }
+
+    .d5 .content {
+      display: grid;
+      gap: 10px;
+    }
+
+    .trip-stat {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px 8px;
+      background: rgba(255, 252, 247, 0.72);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 1.35rem;
+    }
+
+    .stat small {
+      color: var(--muted);
+    }
+
+    .d6 .screen {
+      --paper: #f8efe2;
+      --ink: #2f261f;
+      --muted: #786755;
+      --line: #dcc5aa;
+      --terracotta: #a97553;
+      --terracotta-strong: #7f543b;
+      background: linear-gradient(180deg, #fbf3e7, #f5e4cf);
+    }
+
+    .cook-row {
+      display: grid;
+      grid-template-columns: 52px 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .thumb {
+      height: 52px;
+      border-radius: var(--radius);
+      background:
+        linear-gradient(135deg, rgba(184, 111, 82, 0.55), rgba(124, 148, 115, 0.34)),
+        #d8c8b7;
+    }
+
+    .stars {
+      color: var(--amber);
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 840px) {
+      .page {
+        padding: 20px 12px 40px;
+      }
+
+      .hero,
+      .direction {
+        grid-template-columns: 1fr;
+      }
+
+      .mock-stage {
+        min-height: auto;
+        padding: 14px;
+      }
+
+      .phone {
+        min-height: 640px;
+      }
+
+      .screen {
+        min-height: 612px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="shell">
+      <section class="hero">
+        <div>
+          <div class="eyebrow">ChopChopShop UX exploration</div>
+          <h1>Six warm, mobile-first directions for the household food loop</h1>
+          <p>Each direction keeps the same product core: a shared weekly meal plan becomes a trusted shopping list, then completed trips become cookbook history.</p>
+        </div>
+        <aside class="meta">
+          <strong>Design foundation</strong>
+          <span>Warm-neutral base, muted terracotta accent, sage success, amber caution, light and dark token support.</span>
+          <strong>Interaction anchor</strong>
+          <span>Bottom navigation, bottom sheets, swipe rows, transparent generated suggestions, reversible shopping actions.</span>
+        </aside>
+      </section>
+
+      <nav class="toolbar" aria-label="Design directions">
+        <button class="tab" type="button" aria-selected="true" data-target="d1">1. Warm Routine</button>
+        <button class="tab" type="button" aria-selected="false" data-target="d2">2. Shared Market</button>
+        <button class="tab" type="button" aria-selected="false" data-target="d3">3. Weekly Notebook</button>
+        <button class="tab" type="button" aria-selected="false" data-target="d4">4. Dark Kitchen</button>
+        <button class="tab" type="button" aria-selected="false" data-target="d5">5. Trip Mode</button>
+        <button class="tab" type="button" aria-selected="false" data-target="d6">6. Food Memory</button>
+      </nav>
+
+      <section class="directions">
+        <article class="direction is-active" id="d1">
+          <div class="brief">
+            <h2>Warm Routine</h2>
+            <p>The default candidate: balanced, calm, and very close to the target app. It gives the weekly plan enough structure without making it feel like a calendar product.</p>
+            <div class="swatches">
+              <span class="swatch" style="background:#f7f1e8"></span>
+              <span class="swatch" style="background:#d8c8b7"></span>
+              <span class="swatch" style="background:#b86f52"></span>
+              <span class="swatch" style="background:#7c9473"></span>
+            </div>
+            <div class="chips">
+              <span class="chip">Best all-rounder</span>
+              <span class="chip">Plan first</span>
+              <span class="chip">Calm hierarchy</span>
+            </div>
+            <ul class="notes">
+              <li>Strong fit for `/app/planned` and generated suggestions.</li>
+              <li>Uses terracotta only for action, selection, and progress.</li>
+              <li>Good base direction for MVP implementation.</li>
+            </ul>
+          </div>
+          <div class="mock-stage d1">
+            <div class="phone">
+              <div class="screen">
+                <div class="status"><span>09:41</span><span>Thu Apr 30</span></div>
+                <header class="app-header"><div class="app-title">Planned</div><div class="avatar">PA</div></header>
+                <div class="content">
+                  <div class="week-strip"><span>&lt;</span><strong>Week of Apr 27</strong><span>&gt;</span></div>
+                  <div class="day-card"><strong>Mon Apr 27</strong><small>Middag - Tacos<br />4 portions</small></div>
+                  <div class="day-card"><strong>Tue Apr 28</strong><small>No meal planned</small></div>
+                  <div class="day-card"><strong>Wed Apr 29</strong><small>Middag - Spaghetti bolognese<br />4 portions</small></div>
+                  <div class="day-card"><strong>Thu Apr 30</strong><small>Lunsj - Caesarsalat<br />2 portions</small></div>
+                  <button class="cta" type="button">Generate shopping list</button>
+                </div>
+                <nav class="bottom-nav"><div class="nav-item">Chef</div><div class="nav-item active">Plan</div><div class="nav-item">Shop</div><div class="nav-item">Book</div><div class="nav-item">PA</div></nav>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="direction" id="d2">
+          <div class="brief">
+            <h2>Shared Market</h2>
+            <p>A shopping-first interpretation inspired by AnyList. It emphasizes grouped rows, attribution, and one-handed completion.</p>
+            <div class="swatches">
+              <span class="swatch" style="background:#faf5ed"></span>
+              <span class="swatch" style="background:#d6c6b4"></span>
+              <span class="swatch" style="background:#7c9473"></span>
+              <span class="swatch" style="background:#b86f52"></span>
+            </div>
+            <div class="chips">
+              <span class="chip">Shopping clarity</span>
+              <span class="chip">Grouped rows</span>
+              <span class="chip">Sage accent</span>
+            </div>
+            <ul class="notes">
+              <li>Excellent for the store-use moment.</li>
+              <li>Aisle grouping can stay visual-only for MVP if backend grouping is not ready.</li>
+              <li>Risks making the product feel list-first instead of planning-first.</li>
+            </ul>
+          </div>
+          <div class="mock-stage d2">
+            <div class="phone">
+              <div class="screen">
+                <div class="status"><span>09:41</span><span>Shared list</span></div>
+                <header class="app-header"><div class="app-title">Shopping</div><div class="avatar">PA</div></header>
+                <div class="content">
+                  <div class="search">6 items - added by Paal, Maren</div>
+                  <div class="aisle">Dinner ingredients</div>
+                  <div class="list">
+                    <div class="row"><span class="check">✓</span><div><strong>800 g kjøttdeig</strong><small>from Spaghetti bolognese</small></div><span class="tag">PA</span></div>
+                    <div class="row"><span class="check"></span><div><strong>2 bks tomatoes</strong><small>from Tacos and Spaghetti</small></div><span class="tag">M</span></div>
+                    <div class="row"><span class="check"></span><div><strong>4 fedd hvitløk</strong><small>generated from plan</small></div><span class="tag good">new</span></div>
+                  </div>
+                  <div class="aisle">Manual</div>
+                  <div class="row"><span class="check"></span><div><strong>1 L milk</strong><small>manual</small></div><span class="tag">J</span></div>
+                </div>
+                <nav class="bottom-nav"><div class="nav-item">Chef</div><div class="nav-item">Plan</div><div class="nav-item active">Shop</div><div class="nav-item">Book</div><div class="nav-item">PA</div></nav>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="direction" id="d3">
+          <div class="brief">
+            <h2>Weekly Notebook</h2>
+            <p>A warmer, more tactile weekly-planning direction. It borrows the emotional softness of a handwritten household plan while keeping controls crisp.</p>
+            <div class="swatches">
+              <span class="swatch" style="background:#fff8ea"></span>
+              <span class="swatch" style="background:#dec8a9"></span>
+              <span class="swatch" style="background:#c18b3a"></span>
+              <span class="swatch" style="background:#b86f52"></span>
+            </div>
+            <div class="chips">
+              <span class="chip">Most domestic</span>
+              <span class="chip">Amber warmth</span>
+              <span class="chip">Planner mood</span>
+            </div>
+            <ul class="notes">
+              <li>Memorable and friendly for a school demo.</li>
+              <li>Could become too cute if overused.</li>
+              <li>Best as an influence, not necessarily the whole system.</li>
+            </ul>
+          </div>
+          <div class="mock-stage d3">
+            <div class="phone">
+              <div class="screen">
+                <div class="status"><span>09:41</span><span>Kollektivet</span></div>
+                <header class="app-header"><div class="app-title">This week</div><div class="avatar">PA</div></header>
+                <div class="content">
+                  <div class="segmented"><span class="pill active">Mon</span><span class="pill">Tue</span><span class="pill">Wed</span><span class="pill">Thu</span><span class="pill">Fri</span></div>
+                  <div class="day-card"><strong>Today</strong><small>Middag - Linsekarri<br />Nora has ingredients covered</small></div>
+                  <div class="day-card"><strong>Tomorrow</strong><small>No meal planned</small></div>
+                  <div class="day-card"><strong>Friday</strong><small>Middag - Tacos<br />6 portions</small></div>
+                  <button class="cta" type="button">Add recipe</button>
+                </div>
+                <nav class="bottom-nav"><div class="nav-item">Chef</div><div class="nav-item active">Plan</div><div class="nav-item">Shop</div><div class="nav-item">Book</div><div class="nav-item">PA</div></nav>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="direction" id="d4">
+          <div class="brief">
+            <h2>Dark Kitchen</h2>
+            <p>A production-ready dark theme direction that keeps warmth in the surfaces. It avoids cool slate and keeps action color readable.</p>
+            <div class="swatches">
+              <span class="swatch" style="background:#211b17"></span>
+              <span class="swatch" style="background:#4a3b32"></span>
+              <span class="swatch" style="background:#c27a5c"></span>
+              <span class="swatch" style="background:#f5eee5"></span>
+            </div>
+            <div class="chips">
+              <span class="chip">Dark mode</span>
+              <span class="chip">Warm surfaces</span>
+              <span class="chip">High contrast</span>
+            </div>
+            <ul class="notes">
+              <li>Should be built from the same semantic tokens as light mode.</li>
+              <li>Useful to test contrast before implementation.</li>
+              <li>Great for evening planning and shopping trips.</li>
+            </ul>
+          </div>
+          <div class="mock-stage d4">
+            <div class="phone">
+              <div class="screen">
+                <div class="status"><span>21:16</span><span>Dark</span></div>
+                <header class="app-header"><div class="app-title">Chef</div><div class="avatar">PA</div></header>
+                <div class="content">
+                  <div class="search">Search recipes...</div>
+                  <div class="segmented"><span class="pill">Frokost</span><span class="pill">Lunsj</span><span class="pill active">Middag</span></div>
+                  <div class="list">
+                    <div class="row"><div><strong>Spaghetti bolognese</strong><small>Middag - 4 portions</small></div><span class="tag">Plan</span></div>
+                    <div class="row"><div><strong>Linsekarri</strong><small>Middag - vegetarian</small></div><span class="tag good">liked</span></div>
+                    <div class="row"><div><strong>Tacos</strong><small>Middag - 6 portions</small></div><span class="tag warn">popular</span></div>
+                  </div>
+                </div>
+                <nav class="bottom-nav"><div class="nav-item active">Chef</div><div class="nav-item">Plan</div><div class="nav-item">Shop</div><div class="nav-item">Book</div><div class="nav-item">PA</div></nav>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="direction" id="d5">
+          <div class="brief">
+            <h2>Trip Mode</h2>
+            <p>A high-clarity grocery-trip mode. It makes progress visible and keeps the list dense enough for a moving user in a store.</p>
+            <div class="swatches">
+              <span class="swatch" style="background:#f5efe7"></span>
+              <span class="swatch" style="background:#d1c2b2"></span>
+              <span class="swatch" style="background:#b86f52"></span>
+              <span class="swatch" style="background:#7c9473"></span>
+            </div>
+            <div class="chips">
+              <span class="chip">Most practical</span>
+              <span class="chip">Dense rows</span>
+              <span class="chip">Progress stats</span>
+            </div>
+            <ul class="notes">
+              <li>Best for Jonas' shopping journey.</li>
+              <li>Could be too operational for Chef and Cookbook.</li>
+              <li>Strong candidate as a screen-specific treatment.</li>
+            </ul>
+          </div>
+          <div class="mock-stage d5">
+            <div class="phone">
+              <div class="screen">
+                <div class="status"><span>09:41</span><span>Store mode</span></div>
+                <header class="app-header"><div class="app-title">Shopping</div><div class="avatar">PA</div></header>
+                <div class="content">
+                  <div class="trip-stat">
+                    <div class="stat"><strong>6</strong><small>active</small></div>
+                    <div class="stat"><strong>3</strong><small>hidden</small></div>
+                    <div class="stat"><strong>2</strong><small>meals</small></div>
+                  </div>
+                  <div class="row"><div><strong>800 g kjøttdeig</strong><small>Swipe or tap when in cart</small></div><span class="tag">PA</span></div>
+                  <div class="row"><div><strong>2 bks tomatoes</strong><small>from 2 planned meals</small></div><span class="tag">M</span></div>
+                  <div class="row"><div><strong>500 g pasta</strong><small>already on shopping list</small></div><span class="tag warn">kept</span></div>
+                  <button class="cta" type="button">Purchase complete</button>
+                </div>
+                <nav class="bottom-nav"><div class="nav-item">Chef</div><div class="nav-item">Plan</div><div class="nav-item active">Shop</div><div class="nav-item">Book</div><div class="nav-item">PA</div></nav>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="direction" id="d6">
+          <div class="brief">
+            <h2>Food Memory</h2>
+            <p>A cookbook-forward direction that makes completed meals feel rewarding. It is useful for the post-shopping moment and re-planning from history.</p>
+            <div class="swatches">
+              <span class="swatch" style="background:#f8efe2"></span>
+              <span class="swatch" style="background:#dcc5aa"></span>
+              <span class="swatch" style="background:#a97553"></span>
+              <span class="swatch" style="background:#c18b3a"></span>
+            </div>
+            <div class="chips">
+              <span class="chip">Cookbook tone</span>
+              <span class="chip">History reward</span>
+              <span class="chip">Rating focus</span>
+            </div>
+            <ul class="notes">
+              <li>Best for making completion feel meaningful.</li>
+              <li>Pairs well with Warm Routine as a later screen treatment.</li>
+              <li>Needs care so cookbook does not feel like a generic recipe app.</li>
+            </ul>
+          </div>
+          <div class="mock-stage d6">
+            <div class="phone">
+              <div class="screen">
+                <div class="status"><span>09:41</span><span>Household history</span></div>
+                <header class="app-header"><div class="app-title">Cookbook</div><div class="avatar">PA</div></header>
+                <div class="content">
+                  <div class="search">Search cooked meals...</div>
+                  <div class="segmented"><span class="pill">All</span><span class="pill active">Middag</span><span class="pill">Lunsj</span></div>
+                  <div class="list">
+                    <div class="row cook-row"><span class="thumb"></span><div><strong>Spaghetti bolognese</strong><small>Cooked 5 times<br />Last: Wed Apr 29</small></div><span class="stars">5</span></div>
+                    <div class="row cook-row"><span class="thumb"></span><div><strong>Tacos</strong><small>Cooked 3 times<br />Last: Mon Apr 27</small></div><span class="stars">4</span></div>
+                    <div class="row cook-row"><span class="thumb"></span><div><strong>Linsekarri</strong><small>Cooked 2 times<br />Last: Sun Apr 19</small></div><span class="stars">3</span></div>
+                  </div>
+                </div>
+                <nav class="bottom-nav"><div class="nav-item">Chef</div><div class="nav-item">Plan</div><div class="nav-item">Shop</div><div class="nav-item active">Book</div><div class="nav-item">PA</div></nav>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const tabs = document.querySelectorAll(".tab");
+    const directions = document.querySelectorAll(".direction");
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const target = tab.dataset.target;
+        tabs.forEach((item) => item.setAttribute("aria-selected", String(item === tab)));
+        directions.forEach((direction) => {
+          direction.classList.toggle("is-active", direction.id === target);
+        });
+      });
+    });
+  </script>
+</body>
+</html>

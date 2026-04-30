@@ -34,13 +34,32 @@ public class PlanlagteMaaltiderController : ControllerBase
         var rows = await _db.PlanlagteMaaltider
             .AsNoTracking()
             .Where(x => x.HusholdningId == householdId.Value && x.UkeStartDato == monday)
-            .Include(x => x.Oppskrift)
+            .Include(x => x.Oppskrift!)
+                .ThenInclude(o => o.Ingredienser)
+                .ThenInclude(i => i.Varetype)
+            .Include(x => x.Oppskrift!)
+                .ThenInclude(o => o.Ingredienser)
+                .ThenInclude(i => i.Maaleenhet)
             .Include(x => x.Maaltidstype)
             .OrderBy(x => x.Dag)
             .ThenBy(x => x.MaaltidstypeId)
             .ToListAsync();
 
-        var dto = rows.Select(MapToDto).ToList();
+        var mealIds = rows.Select(r => r.Id).ToList();
+        var exclusionRows = await _db.PlanlagteMaaltidEkskluderteIngredienser
+            .AsNoTracking()
+            .Where(e => mealIds.Contains(e.PlanlagtMaaltidId))
+            .Select(e => new { e.PlanlagtMaaltidId, e.IngrediensId })
+            .ToListAsync();
+
+        var exclusionMap = exclusionRows
+            .GroupBy(e => e.PlanlagtMaaltidId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.IngrediensId).ToHashSet());
+
+        var dto = rows
+            .Select(r =>
+                MapToDto(r, exclusionMap.TryGetValue(r.Id, out var set) ? set : new HashSet<ulong>()))
+            .ToList();
         return Ok(dto);
     }
 
@@ -121,10 +140,11 @@ public class PlanlagteMaaltiderController : ControllerBase
             throw;
         }
 
-        await _db.Entry(entity).Reference(x => x.Oppskrift).LoadAsync();
-        await _db.Entry(entity).Reference(x => x.Maaltidstype).LoadAsync();
+        var detail = await LoadMealWithDetails(entity.Id, householdId.Value);
+        if (detail == null)
+            return Problem("Kunne ikke hente planlagt måltid etter lagring.");
 
-        return Ok(MapToDto(entity));
+        return Ok(MapToDto(detail, new HashSet<ulong>()));
     }
 
     [HttpPut("{id:long}/servings")]
@@ -143,8 +163,6 @@ public class PlanlagteMaaltiderController : ControllerBase
             return BadRequest(new { message = "Antall porsjoner må være mellom 1 og 20." });
 
         var entity = await _db.PlanlagteMaaltider
-            .Include(x => x.Oppskrift)
-            .Include(x => x.Maaltidstype)
             .FirstOrDefaultAsync(x => x.Id == (ulong)id && x.HusholdningId == householdId.Value);
 
         if (entity == null)
@@ -155,11 +173,210 @@ public class PlanlagteMaaltiderController : ControllerBase
 
         await _db.SaveChangesAsync();
 
-        return Ok(MapToDto(entity));
+        var detail = await LoadMealWithDetails(entity.Id, householdId.Value);
+        if (detail == null)
+            return NotFound(new { message = "Planlagt måltid ikke funnet." });
+
+        var excluded = await LoadExclusionSet(entity.Id);
+        return Ok(MapToDto(detail, excluded));
     }
 
-    private static PlannedMealDto MapToDto(PlanlagtMaaltid x)
+    [HttpPost("{id:long}/ekskluder")]
+    public async Task<IActionResult> ExcludeIngredient(long id, [FromBody] ExcludeIngredientRequest? body)
     {
+        if (id < 1) return BadRequest(new { message = "Ugyldig id." });
+
+        var ingrediensId = body?.IngrediensId ?? 0;
+        if (ingrediensId < 1)
+            return BadRequest(new { message = "Ugyldig ingrediens-id." });
+
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var householdId = await GetHouseholdId(userId.Value);
+        if (householdId == null)
+            return BadRequest(new { message = "Du må tilhøre en husholdning." });
+
+        var meal = await _db.PlanlagteMaaltider.FirstOrDefaultAsync(x =>
+            x.Id == (ulong)id && x.HusholdningId == householdId.Value);
+
+        if (meal == null)
+            return NotFound(new { message = "Planlagt måltid ikke funnet." });
+
+        var ingredientOk = await _db.Ingredienser.AnyAsync(i =>
+            i.Id == ingrediensId && i.OppskriftId == meal.OppskriftId);
+
+        if (!ingredientOk)
+            return NotFound(new { message = "Ingrediensen tilhører ikke denne planlagte måltiden." });
+
+        var exists = await _db.PlanlagteMaaltidEkskluderteIngredienser.AnyAsync(x =>
+            x.PlanlagtMaaltidId == meal.Id && x.IngrediensId == ingrediensId);
+
+        if (!exists)
+        {
+            var exclusion = new PlanlagtMaaltidEkskludertIngrediens
+            {
+                PlanlagtMaaltidId = meal.Id,
+                IngrediensId = ingrediensId,
+                CreatedAt = DateTime.UtcNow
+            };
+            _db.PlanlagteMaaltidEkskluderteIngredienser.Add(exclusion);
+
+            try
+            {
+                await _db.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                _db.Entry(exclusion).State = EntityState.Detached;
+                var duplicateNowExists = await _db.PlanlagteMaaltidEkskluderteIngredienser.AnyAsync(x =>
+                    x.PlanlagtMaaltidId == meal.Id && x.IngrediensId == ingrediensId);
+
+                if (!duplicateNowExists)
+                    throw;
+            }
+        }
+
+        var detail = await LoadMealWithDetails(meal.Id, householdId.Value);
+        if (detail == null)
+            return NotFound(new { message = "Planlagt måltid ikke funnet." });
+
+        var excluded = await LoadExclusionSet(meal.Id);
+        return Ok(MapToDto(detail, excluded));
+    }
+
+    [HttpDelete("{id:long}/ekskluder/{ingrediensId:long}")]
+    public async Task<IActionResult> RestoreIngredient(long id, long ingrediensId)
+    {
+        if (id < 1 || ingrediensId < 1)
+            return BadRequest(new { message = "Ugyldig id." });
+
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var householdId = await GetHouseholdId(userId.Value);
+        if (householdId == null)
+            return BadRequest(new { message = "Du må tilhøre en husholdning." });
+
+        var meal = await _db.PlanlagteMaaltider.FirstOrDefaultAsync(x =>
+            x.Id == (ulong)id && x.HusholdningId == householdId.Value);
+
+        if (meal == null)
+            return NotFound(new { message = "Planlagt måltid ikke funnet." });
+
+        var ingredientOk = await _db.Ingredienser.AnyAsync(i =>
+            i.Id == (ulong)ingrediensId && i.OppskriftId == meal.OppskriftId);
+
+        if (!ingredientOk)
+            return NotFound(new { message = "Ingrediensen tilhører ikke denne planlagte måltiden." });
+
+        var row = await _db.PlanlagteMaaltidEkskluderteIngredienser.FirstOrDefaultAsync(x =>
+            x.PlanlagtMaaltidId == meal.Id && x.IngrediensId == (ulong)ingrediensId);
+
+        if (row != null)
+        {
+            _db.PlanlagteMaaltidEkskluderteIngredienser.Remove(row);
+            await _db.SaveChangesAsync();
+        }
+
+        var detail = await LoadMealWithDetails(meal.Id, householdId.Value);
+        if (detail == null)
+            return NotFound(new { message = "Planlagt måltid ikke funnet." });
+
+        var excluded = await LoadExclusionSet(meal.Id);
+        return Ok(MapToDto(detail, excluded));
+    }
+
+    [HttpDelete("{id:long}")]
+    public async Task<IActionResult> DeletePlannedMeal(long id)
+    {
+        if (id < 1) return BadRequest(new { message = "Ugyldig id." });
+
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var householdId = await GetHouseholdId(userId.Value);
+        if (householdId == null)
+            return BadRequest(new { message = "Du må tilhøre en husholdning." });
+
+        var meal = await _db.PlanlagteMaaltider.FirstOrDefaultAsync(x =>
+            x.Id == (ulong)id && x.HusholdningId == householdId.Value);
+
+        if (meal == null)
+            return NotFound(new { message = "Planlagt måltid ikke funnet." });
+
+        var purchased = await _db.Handleliste.AnyAsync(h =>
+            h.PlanlagtMaaltidId == meal.Id && h.PurchasedAt != null);
+
+        if (purchased)
+            return Conflict(new
+            {
+                message =
+                    "Dette måltidet kan ikke fjernes fordi handlelisten viser at det allerede er handlet. Kokkeloggen må beholdes."
+            });
+
+        await using var tx = await _db.Database.BeginTransactionAsync();
+        try
+        {
+            var linked = await _db.Handleliste.Where(h => h.PlanlagtMaaltidId == meal.Id).ToListAsync();
+            _db.Handleliste.RemoveRange(linked);
+            _db.PlanlagteMaaltider.Remove(meal);
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
+        }
+        catch
+        {
+            await tx.RollbackAsync();
+            throw;
+        }
+
+        return NoContent();
+    }
+
+    private async Task<PlanlagtMaaltid?> LoadMealWithDetails(ulong mealId, ulong householdId)
+    {
+        return await _db.PlanlagteMaaltider
+            .AsNoTracking()
+            .Include(x => x.Oppskrift!)
+                .ThenInclude(o => o.Ingredienser)
+                .ThenInclude(i => i.Varetype)
+            .Include(x => x.Oppskrift!)
+                .ThenInclude(o => o.Ingredienser)
+                .ThenInclude(i => i.Maaleenhet)
+            .Include(x => x.Maaltidstype)
+            .FirstOrDefaultAsync(x => x.Id == mealId && x.HusholdningId == householdId);
+    }
+
+    private async Task<HashSet<ulong>> LoadExclusionSet(ulong mealId)
+    {
+        var ids = await _db.PlanlagteMaaltidEkskluderteIngredienser
+            .AsNoTracking()
+            .Where(e => e.PlanlagtMaaltidId == mealId)
+            .Select(e => e.IngrediensId)
+            .ToListAsync();
+
+        return ids.ToHashSet();
+    }
+
+    private static PlannedMealDto MapToDto(PlanlagtMaaltid x, IReadOnlySet<ulong> excludedIngredientIds)
+    {
+        var ingredients = x.Oppskrift?.Ingredienser
+                ?.OrderBy(i => i.Id)
+                .Select(i => new PlannedMealIngredientDto
+                {
+                    Id = i.Id,
+                    VaretypeId = i.VaretypeId,
+                    Varetype = i.Varetype?.Navn ?? string.Empty,
+                    Kvantitet = i.Kvantitet,
+                    MaaleenhetId = i.MaaleenhetId,
+                    Maaleenhet = i.Maaleenhet?.Enhet,
+                    Type = i.Type,
+                    Valgfritt = i.Valgfritt,
+                    Excluded = excludedIngredientIds.Contains(i.Id)
+                })
+                .ToList()
+            ?? new List<PlannedMealIngredientDto>();
+
         return new PlannedMealDto
         {
             Id = x.Id,
@@ -169,7 +386,8 @@ public class PlanlagteMaaltiderController : ControllerBase
             MealType = x.Maaltidstype?.Navn ?? string.Empty,
             OppskriftId = x.OppskriftId,
             OppskriftNavn = x.Oppskrift?.Navn ?? string.Empty,
-            Servings = x.Porsjoner
+            Servings = x.Porsjoner,
+            Ingredients = ingredients
         };
     }
 

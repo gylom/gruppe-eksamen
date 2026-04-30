@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Link } from "react-router"
 import { toast } from "sonner"
 
+import { SwipeActionRow } from "~/components/SwipeActionRow"
 import { DetailSheet } from "~/components/detail-sheet"
 import { Button, buttonVariants } from "~/components/ui/button"
 import { Label } from "~/components/ui/label"
@@ -12,9 +13,12 @@ import {
   PLANNING_MEAL_TYPE_ORDER,
   sortPlanningCategories,
 } from "~/features/planning/constants"
-import type { PlannedMealDto } from "~/features/planning/types"
+import type { PlannedMealDto, PlannedMealIngredientDto } from "~/features/planning/types"
 import {
+  useDeletePlannedMeal,
+  useExcludePlannedMealIngredient,
   usePlannedMeals,
+  useRestorePlannedMealIngredient,
   useUpdatePlannedMealServings,
 } from "~/features/planning/use-planned-meals"
 import { useRecipeCategories } from "~/features/recipes/use-recipes"
@@ -34,15 +38,31 @@ function clampServings(n: number): number {
   return Math.min(20, Math.max(1, Math.round(n)))
 }
 
+function formatIngredientLine(ing: PlannedMealIngredientDto): string {
+  const qty =
+    ing.kvantitet != null
+      ? String(ing.kvantitet).replace(/\.00$/, "").replace(/(\.\d*?)0+$/, "$1")
+      : ""
+  const unit = (ing.maaleenhet ?? "").trim()
+  const head = [qty, unit].filter(Boolean).join(" ").trim()
+  const base = ing.varetype?.trim() ?? ""
+  return head ? `${head} · ${base}` : base
+}
+
 export default function PlanRoute() {
   const [weekMonday, setWeekMonday] = useState(() => getMondayKeyContaining())
   const mealsQuery = usePlannedMeals(weekMonday)
   const categoriesQuery = useRecipeCategories()
   const updateServingsMutation = useUpdatePlannedMealServings()
+  const excludeIngredientMutation = useExcludePlannedMealIngredient()
+  const restoreIngredientMutation = useRestorePlannedMealIngredient()
+  const deletePlannedMealMutation = useDeletePlannedMeal()
 
   const [editingMeal, setEditingMeal] = useState<PlannedMealDto | null>(null)
   const [editServingsValue, setEditServingsValue] = useState(4)
   const [editError, setEditError] = useState<string | null>(null)
+  const [sheetStep, setSheetStep] = useState<"edit" | "confirmRemove">("edit")
+  const [deleteProtectedReason, setDeleteProtectedReason] = useState<string | null>(null)
 
   const planningCategories = useMemo(() => {
     const raw = categoriesQuery.data ?? []
@@ -56,10 +76,26 @@ export default function PlanRoute() {
 
   const weekDays = useMemo(() => expandWeekFromMonday(weekMonday), [weekMonday])
 
+  const editingMealId = editingMeal?.id
+
   useEffect(() => {
-    if (editingMeal) setEditServingsValue(editingMeal.servings)
+    if (editingMealId == null) return
     setEditError(null)
-  }, [editingMeal])
+    setSheetStep("edit")
+    setDeleteProtectedReason(null)
+  }, [editingMealId])
+
+  useEffect(() => {
+    if (!editingMeal) return
+    setEditServingsValue(editingMeal.servings)
+  }, [editingMeal?.id, editingMeal?.servings])
+
+  useEffect(() => {
+    if (editingMealId == null || mealsQuery.data == null) return
+    const fresh = mealsQuery.data.find((m) => m.id === editingMealId)
+    if (fresh) setEditingMeal(fresh)
+    else setEditingMeal(null)
+  }, [mealsQuery.data, editingMealId])
 
   function mealForSlot(dayNumber: number, mealTypeId: number): PlannedMealDto | undefined {
     return mealsQuery.data?.find((m) => m.day === dayNumber && m.mealTypeId === mealTypeId)
@@ -87,7 +123,65 @@ export default function PlanRoute() {
     setEditServingsValue((s) => clampServings(s + delta))
   }
 
+  async function toggleIngredientExcluded(ing: PlannedMealIngredientDto) {
+    if (!editingMeal) return
+    try {
+      if (ing.excluded) {
+        await restoreIngredientMutation.mutateAsync({
+          plannedMealId: editingMeal.id,
+          ingrediensId: ing.id,
+          weekStartDate: editingMeal.weekStartDate,
+        })
+        toast.success("Ingrediens er med i planen igjen.")
+      } else {
+        await excludeIngredientMutation.mutateAsync({
+          plannedMealId: editingMeal.id,
+          ingrediensId: ing.id,
+          weekStartDate: editingMeal.weekStartDate,
+        })
+        toast.success("Markert som du har allerede.")
+      }
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Kunne ikke oppdatere ingrediens."
+      toast.error(msg)
+    }
+  }
+
+  function ingredientRowPending(ing: PlannedMealIngredientDto): boolean {
+    if (!editingMeal) return false
+    const ex =
+      excludeIngredientMutation.isPending &&
+      excludeIngredientMutation.variables?.plannedMealId === editingMeal.id &&
+      excludeIngredientMutation.variables?.ingrediensId === ing.id
+    const re =
+      restoreIngredientMutation.isPending &&
+      restoreIngredientMutation.variables?.plannedMealId === editingMeal.id &&
+      restoreIngredientMutation.variables?.ingrediensId === ing.id
+    return Boolean(ex || re)
+  }
+
+  async function confirmRemovePlannedMeal() {
+    if (!editingMeal) return
+    setDeleteProtectedReason(null)
+    try {
+      await deletePlannedMealMutation.mutateAsync({
+        id: editingMeal.id,
+        weekStartDate: editingMeal.weekStartDate,
+      })
+      toast.success("Måltid fjernet fra uken.")
+      setEditingMeal(null)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        setDeleteProtectedReason(err.message)
+        return
+      }
+      const msg = err instanceof ApiError ? err.message : "Kunne ikke fjerne måltidet."
+      toast.error(msg)
+    }
+  }
+
   const editTitleId = "plan-edit-meal-title"
+  const ingredients = editingMeal?.ingredients ?? []
 
   return (
     <section className="p-4 pb-28" aria-labelledby="plan-heading">
@@ -227,64 +321,181 @@ export default function PlanRoute() {
         footer={
           editingMeal ? (
             <div className="flex w-full gap-2">
-              <Button type="button" variant="outline" className="flex-1" onClick={() => setEditingMeal(null)}>
-                Avbryt
-              </Button>
-              <Button
-                type="submit"
-                form={EDIT_FORM_ID}
-                className="flex-1"
-                disabled={updateServingsMutation.isPending}
-              >
-                Lagre
-              </Button>
+              {sheetStep === "confirmRemove" ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    disabled={deletePlannedMealMutation.isPending}
+                    onClick={() => {
+                      setSheetStep("edit")
+                      setDeleteProtectedReason(null)
+                    }}
+                  >
+                    Tilbake
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="flex-1"
+                    disabled={deletePlannedMealMutation.isPending}
+                    onClick={() => void confirmRemovePlannedMeal()}
+                  >
+                    {deletePlannedMealMutation.isPending ? "Fjerner…" : "Bekreft fjerning"}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => setEditingMeal(null)}>
+                    Avbryt
+                  </Button>
+                  <Button
+                    type="submit"
+                    form={EDIT_FORM_ID}
+                    className="flex-1"
+                    disabled={updateServingsMutation.isPending}
+                  >
+                    Lagre
+                  </Button>
+                </>
+              )}
             </div>
           ) : null
         }
       >
-        {editingMeal ? (
-          <form id={EDIT_FORM_ID} className="space-y-4" onSubmit={(e) => void submitServingsEdit(e)}>
-            <div>
-              <Label htmlFor="plan-edit-servings-display">Porsjoner</Label>
-              <div className="mt-2 flex items-center gap-3">
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  aria-label="Trekk fra én porsjon"
-                  disabled={editServingsValue <= 1 || updateServingsMutation.isPending}
-                  onClick={() => bumpEdit(-1)}
-                >
-                  −
-                </Button>
-                <span
-                  id="plan-edit-servings-display"
-                  className="min-w-[2rem] text-center font-medium tabular-nums"
-                  aria-live="polite"
-                >
-                  {editServingsValue}
-                </span>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  aria-label="Legg til én porsjon"
-                  disabled={editServingsValue >= 20 || updateServingsMutation.isPending}
-                  onClick={() => bumpEdit(1)}
-                >
-                  +
-                </Button>
+        {editingMeal && sheetStep === "edit" ? (
+          <>
+            <form id={EDIT_FORM_ID} className="space-y-4" onSubmit={(e) => void submitServingsEdit(e)}>
+              <div>
+                <Label htmlFor="plan-edit-servings-display">Porsjoner</Label>
+                <div className="mt-2 flex items-center gap-3">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    aria-label="Trekk fra én porsjon"
+                    disabled={editServingsValue <= 1 || updateServingsMutation.isPending}
+                    onClick={() => bumpEdit(-1)}
+                  >
+                    −
+                  </Button>
+                  <span
+                    id="plan-edit-servings-display"
+                    className="min-w-[2rem] text-center font-medium tabular-nums"
+                    aria-live="polite"
+                  >
+                    {editServingsValue}
+                  </span>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    aria-label="Legg til én porsjon"
+                    disabled={editServingsValue >= 20 || updateServingsMutation.isPending}
+                    onClick={() => bumpEdit(1)}
+                  >
+                    +
+                  </Button>
+                </div>
+              </div>
+              {editError ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {editError}
+                </p>
+              ) : null}
+              <button type="submit" className="sr-only" tabIndex={-1}>
+                Lagre porsjoner
+              </button>
+            </form>
+
+            <div className="mt-6 border-t border-border pt-4">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-foreground">Ingredienser</h3>
+                <span className="text-xs text-muted-foreground">Stryk eller bruk knappen</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Marker det du allerede har hjemme — kun for dette måltidet i planen.
+              </p>
+              <div className="mt-3 space-y-0">
+                {ingredients.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Ingen ingrediensrader på oppskriften.</p>
+                ) : (
+                  ingredients.map((ing) => {
+                    const pending = ingredientRowPending(ing)
+                    const actionLabel = ing.excluded ? "Ta med" : "Har allerede"
+                    const fallbackAria = ing.excluded
+                      ? `Ta med ${ing.varetype} i planen igjen`
+                      : `Marker ${ing.varetype} som du har allerede`
+
+                    return (
+                      <SwipeActionRow
+                        key={ing.id}
+                        actionLabel={actionLabel}
+                        fallbackAriaLabel={fallbackAria}
+                        loading={pending}
+                        disabled={pending}
+                        onAction={() => void toggleIngredientExcluded(ing)}
+                      >
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className="break-words text-sm font-medium leading-snug text-foreground">
+                            {formatIngredientLine(ing)}
+                          </span>
+                          <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                            {ing.valgfritt ? (
+                              <span className="rounded-md border border-border px-1.5 py-0.5">Valgfritt</span>
+                            ) : null}
+                            {ing.type === "tilbehor" ? (
+                              <span className="rounded-md border border-border px-1.5 py-0.5">Tilbehør</span>
+                            ) : null}
+                            {ing.excluded ? (
+                              <span className="rounded-md border border-border bg-muted px-1.5 py-0.5 font-medium text-foreground">
+                                Har allerede hjemme
+                              </span>
+                            ) : (
+                              <span className="rounded-md border border-transparent px-1.5 py-0.5">
+                                Inkludert i plan
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </SwipeActionRow>
+                    )
+                  })
+                )}
               </div>
             </div>
-            {editError ? (
-              <p className="text-sm text-destructive" role="alert">
-                {editError}
+
+            <div className="mt-6 border-t border-border pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => setSheetStep("confirmRemove")}
+              >
+                Fjern måltid fra denne uken
+              </Button>
+            </div>
+          </>
+        ) : null}
+
+        {editingMeal && sheetStep === "confirmRemove" ? (
+          <div className="space-y-3">
+            <p className="text-sm text-foreground">
+              Er du sikker på at du vil fjerne{" "}
+              <span className="font-semibold">{editingMeal.oppskriftNavn}</span> fra{" "}
+              <span className="font-medium">{formatWeekRangeTitleNb(editingMeal.weekStartDate)}</span>? Dette påvirker
+              alle i husholdningen.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Hvis handlelisten viser at måltidet allerede er handlet, kan det ikke fjernes her — kokkeloggen må beholdes.
+            </p>
+            {deleteProtectedReason ? (
+              <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-foreground">
+                {deleteProtectedReason}
               </p>
             ) : null}
-            <button type="submit" className="sr-only" tabIndex={-1}>
-              Lagre porsjoner
-            </button>
-          </form>
+          </div>
         ) : null}
       </DetailSheet>
     </section>

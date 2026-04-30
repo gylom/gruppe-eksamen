@@ -162,25 +162,6 @@ CREATE TABLE Varelager (
 );
 
 -- =========================
--- HANDLELISTE
--- =========================
-CREATE TABLE Handleliste (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    varetype_id BIGINT UNSIGNED NOT NULL,
-    vare_id BIGINT UNSIGNED NULL,
-    user_id BIGINT UNSIGNED NOT NULL,
-    kvantitet DECIMAL(8,2),
-    maaleenhet_id BIGINT UNSIGNED,
-    opprettet DATETIME,
-    endret DATETIME,
-
-    FOREIGN KEY (varetype_id) REFERENCES Varetyper(id),
-    FOREIGN KEY (vare_id) REFERENCES Varer(id),
-    FOREIGN KEY (user_id) REFERENCES Brukere(id),
-    FOREIGN KEY (maaleenhet_id) REFERENCES Maaleenheter(id)
-);
-
--- =========================
 -- FORBRUK
 -- =========================
 CREATE TABLE Forbruk (
@@ -236,6 +217,66 @@ CREATE TABLE Ingredienser (
     FOREIGN KEY (maaleenhet_id) REFERENCES Maaleenheter(id)
 );
 
+-- =========================
+-- PLANLAGTE MÅLTIDER (Story 2.2)
+-- =========================
+CREATE TABLE PlanlagteMaaltider (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    husholdning_id BIGINT UNSIGNED NOT NULL,
+    oppskrift_id BIGINT UNSIGNED NOT NULL,
+    uke_start_dato DATE NOT NULL,
+    dag INT NOT NULL,
+    maaltidstype_id BIGINT UNSIGNED NOT NULL,
+    porsjoner INT NOT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+
+    UNIQUE KEY uk_planlagte_slot (husholdning_id, uke_start_dato, dag, maaltidstype_id),
+
+    FOREIGN KEY (husholdning_id) REFERENCES Husholdning(id),
+    FOREIGN KEY (oppskrift_id) REFERENCES Oppskrifter(id) ON DELETE CASCADE,
+    FOREIGN KEY (maaltidstype_id) REFERENCES Oppskriftskategorier(id)
+);
+
+-- =========================
+-- PLANLAGT MÅLTID — EKSKLUDERT INGREDIENS (Story 2.3)
+-- =========================
+CREATE TABLE PlanlagteMaaltidEkskludertIngrediens (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    planlagt_maaltid_id BIGINT UNSIGNED NOT NULL,
+    ingrediens_id BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL,
+
+    UNIQUE KEY uk_planlagt_maaltid_ingrediens (planlagt_maaltid_id, ingrediens_id),
+
+    FOREIGN KEY (planlagt_maaltid_id) REFERENCES PlanlagteMaaltider(id) ON DELETE CASCADE,
+    FOREIGN KEY (ingrediens_id) REFERENCES Ingredienser(id) ON DELETE CASCADE
+);
+
+-- =========================
+-- HANDLELISTE
+-- =========================
+CREATE TABLE Handleliste (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    varetype_id BIGINT UNSIGNED NOT NULL,
+    vare_id BIGINT UNSIGNED NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    kvantitet DECIMAL(8,2),
+    maaleenhet_id BIGINT UNSIGNED,
+    opprettet DATETIME,
+    endret DATETIME,
+    planlagt_maaltid_id BIGINT UNSIGNED NULL,
+    purchased_at DATETIME NULL,
+
+    KEY idx_handleliste_planlagt_maaltid (planlagt_maaltid_id),
+
+    FOREIGN KEY (varetype_id) REFERENCES Varetyper(id),
+    FOREIGN KEY (vare_id) REFERENCES Varer(id),
+    FOREIGN KEY (user_id) REFERENCES Brukere(id),
+    FOREIGN KEY (maaleenhet_id) REFERENCES Maaleenheter(id),
+    FOREIGN KEY (planlagt_maaltid_id) REFERENCES PlanlagteMaaltider(id) ON DELETE SET NULL
+);
+
 CREATE TABLE Skjuloppskrift (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     oppskrift_id BIGINT UNSIGNED NOT NULL,
@@ -269,25 +310,4 @@ CREATE TABLE Skjulvare (
     FOREIGN KEY (user_id) REFERENCES Brukere(id),
     FOREIGN KEY (varetype_id) REFERENCES Varetyper(id),
     FOREIGN KEY (vare_id) REFERENCES Varer(id)
-);
-
--- =========================
--- PLANLAGTE MÅLTIDER (Story 2.2)
--- =========================
-CREATE TABLE PlanlagteMaaltider (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    husholdning_id BIGINT UNSIGNED NOT NULL,
-    oppskrift_id BIGINT UNSIGNED NOT NULL,
-    uke_start_dato DATE NOT NULL,
-    dag INT NOT NULL,
-    maaltidstype_id BIGINT UNSIGNED NOT NULL,
-    porsjoner INT NOT NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL,
-
-    UNIQUE KEY uk_planlagte_slot (husholdning_id, uke_start_dato, dag, maaltidstype_id),
-
-    FOREIGN KEY (husholdning_id) REFERENCES Husholdning(id),
-    FOREIGN KEY (oppskrift_id) REFERENCES Oppskrifter(id) ON DELETE CASCADE,
-    FOREIGN KEY (maaltidstype_id) REFERENCES Oppskriftskategorier(id)
 );

@@ -29,6 +29,8 @@ public class AppDbContext : DbContext
     public DbSet<Ingrediens> Ingredienser => Set<Ingrediens>();
     public DbSet<Skjuloppskrift> Skjuloppskrifter => Set<Skjuloppskrift>();
     public DbSet<PlanlagtMaaltid> PlanlagteMaaltider => Set<PlanlagtMaaltid>();
+    public DbSet<PlanlagtMaaltidEkskludertIngrediens> PlanlagteMaaltidEkskluderteIngredienser =>
+        Set<PlanlagtMaaltidEkskludertIngrediens>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -281,5 +283,29 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<PlanlagtMaaltid>()
             .HasIndex(x => new { x.HusholdningId, x.UkeStartDato, x.Dag, x.MaaltidstypeId })
             .IsUnique();
+
+        modelBuilder.Entity<PlanlagtMaaltidEkskludertIngrediens>().ToTable("PlanlagteMaaltidEkskludertIngrediens");
+
+        modelBuilder.Entity<PlanlagtMaaltidEkskludertIngrediens>()
+            .HasOne(x => x.PlanlagtMaaltid)
+            .WithMany(x => x.EkskluderteIngredienser)
+            .HasForeignKey(x => x.PlanlagtMaaltidId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<PlanlagtMaaltidEkskludertIngrediens>()
+            .HasOne(x => x.Ingrediens)
+            .WithMany()
+            .HasForeignKey(x => x.IngrediensId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<PlanlagtMaaltidEkskludertIngrediens>()
+            .HasIndex(x => new { x.PlanlagtMaaltidId, x.IngrediensId })
+            .IsUnique();
+
+        modelBuilder.Entity<HandlelisteRad>()
+            .HasOne(x => x.PlanlagtMaaltid)
+            .WithMany()
+            .HasForeignKey(x => x.PlanlagtMaaltidId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

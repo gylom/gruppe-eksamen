@@ -53,3 +53,59 @@ export function useUpdatePlannedMealServings() {
     },
   })
 }
+
+export type PlannedMealIngredientMutationVars = {
+  plannedMealId: number
+  ingrediensId: number
+  weekStartDate: string
+}
+
+export function useExcludePlannedMealIngredient() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ plannedMealId, ingrediensId }: PlannedMealIngredientMutationVars) =>
+      apiFetch<PlannedMealDto>(`/api/planlagte-maaltider/${plannedMealId}/ekskluder`, {
+        method: "POST",
+        body: { ingrediensId },
+      }),
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: ["planned-meals", variables.weekStartDate],
+      })
+    },
+  })
+}
+
+export function useRestorePlannedMealIngredient() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ plannedMealId, ingrediensId }: PlannedMealIngredientMutationVars) =>
+      apiFetch<PlannedMealDto>(
+        `/api/planlagte-maaltider/${plannedMealId}/ekskluder/${ingrediensId}`,
+        { method: "DELETE" },
+      ),
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: ["planned-meals", variables.weekStartDate],
+      })
+    },
+  })
+}
+
+export type DeletePlannedMealVars = {
+  id: number
+  weekStartDate: string
+}
+
+export function useDeletePlannedMeal() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id }: DeletePlannedMealVars) =>
+      apiFetch<null>(`/api/planlagte-maaltider/${id}`, { method: "DELETE" }),
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: ["planned-meals", variables.weekStartDate],
+      })
+    },
+  })
+}

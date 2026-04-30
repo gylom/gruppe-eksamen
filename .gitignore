@@ -15,7 +15,7 @@ frontend/build/
 frontend/.react-router/
 
 # Local agent/tooling state
-.claude/
-.agents/
-_bmad/
-_bmad-output/
+# .claude/
+# .agents/
+# _bmad/
+# _bmad-output/

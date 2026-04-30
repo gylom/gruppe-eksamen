@@ -36,4 +36,7 @@ public class PlanlagtMaaltid
     public Husholdning? Husholdning { get; set; }
     public Oppskrift? Oppskrift { get; set; }
     public Oppskriftskategori? Maaltidstype { get; set; }
+
+    public ICollection<PlanlagtMaaltidEkskludertIngrediens> EkskluderteIngredienser { get; set; } =
+        new List<PlanlagtMaaltidEkskludertIngrediens>();
 }
