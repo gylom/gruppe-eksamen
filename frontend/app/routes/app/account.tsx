@@ -14,6 +14,12 @@ import {
 import { useMe } from "~/features/auth/use-me"
 import { formatInviteForDisplay } from "~/features/household/invite-input"
 import { useGenerateInvite, useHousehold, useRevokeInvite } from "~/features/household/use-household"
+import { ApiError } from "~/lib/api-fetch"
+
+function errorMessage(err: unknown, fallback: string): string {
+  if (err instanceof ApiError && err.message) return err.message
+  return fallback
+}
 
 function formatExpires(iso: string): string {
   try {
@@ -36,6 +42,26 @@ export default function AccountRoute() {
   const isOwner = me.data?.householdRole === "eier"
   const hName = household.data?.household?.navn ?? me.data?.householdName ?? ""
   const active = household.data?.activeInvite
+  const inviteBusy = generateInvite.isPending || revokeInvite.isPending
+
+  async function handleGenerate(successMessage: string) {
+    try {
+      await generateInvite.mutateAsync()
+      toast.success(successMessage)
+    } catch (err) {
+      toast.error(errorMessage(err, "Kunne ikke generere kode."))
+    }
+  }
+
+  async function handleRevoke() {
+    try {
+      await revokeInvite.mutateAsync()
+      toast.success("Invitasjon trukket tilbake")
+      setRevokeOpen(false)
+    } catch (err) {
+      toast.error(errorMessage(err, "Kunne ikke trekke tilbake invitasjon."))
+    }
+  }
 
   async function copyCode(code: string) {
     try {
@@ -139,14 +165,18 @@ export default function AccountRoute() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={generateInvite.isPending}
-                  onClick={() =>
-                    void generateInvite.mutateAsync().then(() => toast.success("Ny kode er klar"))
-                  }
+                  disabled={inviteBusy}
+                  onClick={() => void handleGenerate("Ny kode er klar")}
                 >
                   {generateInvite.isPending ? "Generer…" : "Erstatt kode"}
                 </Button>
-                <Button type="button" variant="destructive" size="sm" onClick={() => setRevokeOpen(true)}>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  disabled={inviteBusy}
+                  onClick={() => setRevokeOpen(true)}
+                >
                   Trekk tilbake
                 </Button>
               </div>
@@ -156,10 +186,8 @@ export default function AccountRoute() {
               <p className="text-sm text-muted-foreground mb-3">Ingen aktiv kode akkurat nå.</p>
               <Button
                 type="button"
-                disabled={generateInvite.isPending}
-                onClick={() =>
-                  void generateInvite.mutateAsync().then(() => toast.success("Invitasjonskode opprettet"))
-                }
+                disabled={inviteBusy}
+                onClick={() => void handleGenerate("Invitasjonskode opprettet")}
               >
                 {generateInvite.isPending ? "Genererer…" : "Generer kode"}
               </Button>
@@ -168,7 +196,13 @@ export default function AccountRoute() {
         </div>
       ) : null}
 
-      <Dialog open={revokeOpen} onOpenChange={setRevokeOpen}>
+      <Dialog
+        open={revokeOpen}
+        onOpenChange={(next) => {
+          if (revokeInvite.isPending) return
+          setRevokeOpen(next)
+        }}
+      >
         <DialogContent showCloseButton>
           <DialogHeader>
             <DialogTitle>Trekk tilbake invitasjon?</DialogTitle>
@@ -177,19 +211,19 @@ export default function AccountRoute() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setRevokeOpen(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={revokeInvite.isPending}
+              onClick={() => setRevokeOpen(false)}
+            >
               Avbryt
             </Button>
             <Button
               type="button"
               variant="destructive"
               disabled={revokeInvite.isPending}
-              onClick={() =>
-                void revokeInvite.mutateAsync().then(() => {
-                  toast.success("Invitasjon trukket tilbake")
-                  setRevokeOpen(false)
-                })
-              }
+              onClick={() => void handleRevoke()}
             >
               {revokeInvite.isPending ? "Trekk tilbake…" : "Trekk tilbake"}
             </Button>

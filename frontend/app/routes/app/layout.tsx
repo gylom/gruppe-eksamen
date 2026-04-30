@@ -10,7 +10,11 @@ export default function AppLayoutRoute() {
   const navigate = useNavigate()
   const me = useMe()
   const hasToken = getToken() !== null
-  const hasNoHousehold = me.data?.householdId === null
+  // Only treat "no household" as authoritative when the query is settled.
+  // While me is refetching (e.g. immediately after onboarding invalidates the
+  // cache), we'd otherwise flicker back to /onboarding using stale data.
+  const meSettled = me.data != null && !me.isFetching
+  const hasNoHousehold = meSettled && me.data.householdId == null
 
   useEffect(() => {
     if (!hasToken) {
@@ -42,7 +46,7 @@ export default function AppLayoutRoute() {
     )
   }
 
-  if (me.isError) {
+  if (me.isError && !me.data) {
     return (
       <AppShell reserveNav>
         <section className="flex min-h-[320px] flex-col justify-center gap-4 p-4">
@@ -50,7 +54,7 @@ export default function AppLayoutRoute() {
             <h1 className="text-lg font-semibold">Kunne ikke laste konto.</h1>
             <p className="text-sm text-muted-foreground">Prøv igjen.</p>
           </div>
-          <Button className="w-fit" onClick={() => void me.refetch()}>
+          <Button className="w-fit" disabled={me.isFetching} onClick={() => void me.refetch()}>
             Prøv igjen
           </Button>
         </section>

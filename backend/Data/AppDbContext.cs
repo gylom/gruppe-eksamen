@@ -67,6 +67,10 @@ public class AppDbContext : DbContext
             .WithMany(x => x.Medlemskap)
             .HasForeignKey(x => x.UserId);
 
+        modelBuilder.Entity<Medlem>()
+            .HasIndex(x => x.UserId)
+            .IsUnique();
+
         modelBuilder.Entity<HusholdningInvitasjon>()
             .HasOne(x => x.Husholdning)
             .WithMany()

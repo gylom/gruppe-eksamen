@@ -4,4 +4,6 @@ INSERT INTO Oppskriftskategorier (id, navn) VALUES
 (3, 'Middag'),
 (4, 'Forrett'),
 (5, 'Dessert'),
-(6, 'Snacks');
+(6, 'Snacks'),
+(7, 'Kveldsmat'),
+(8, 'Mellommaltid');

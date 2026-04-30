@@ -14,26 +14,45 @@ export function useHousehold() {
     queryKey: ["household"],
     queryFn: () => apiFetch<HouseholdContextResponse>("/api/husholdning"),
     enabled: typeof window !== "undefined" && !!getToken() && hasHousehold,
+    refetchInterval: (query) => {
+      const data = query.state.data as HouseholdContextResponse | undefined
+      const expiresAt = data?.activeInvite?.expiresAt
+      if (!expiresAt) return false
+      const msUntilExpiry = new Date(expiresAt).getTime() - Date.now()
+      if (msUntilExpiry <= 0) return false
+      // Refetch one minute before expiry, but no sooner than every 60s.
+      return Math.max(60_000, msUntilExpiry - 60_000)
+    },
   })
 }
 
 export function useCreateHousehold() {
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (body: { navn: string }) =>
       apiFetch<CreateHouseholdResponse>("/api/husholdning", {
         method: "POST",
         body,
       }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["me"] })
+      await queryClient.invalidateQueries({ queryKey: ["household"] })
+    },
   })
 }
 
 export function useJoinHousehold() {
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (body: { code: string }) =>
       apiFetch<MessageResponse>("/api/husholdning/join", {
         method: "POST",
         body: { code: body.code },
       }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["me"] })
+      await queryClient.invalidateQueries({ queryKey: ["household"] })
+    },
   })
 }
 

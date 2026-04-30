@@ -66,8 +66,13 @@ export default function OnboardingRoute() {
   }, [hasHousehold, hasToken, navigate])
 
   async function refreshMeAndGoApp(message: string) {
-    await queryClient.invalidateQueries({ queryKey: ["me"] })
-    await queryClient.refetchQueries({ queryKey: ["me"] })
+    try {
+      await queryClient.invalidateQueries({ queryKey: ["me"] })
+      await queryClient.refetchQueries({ queryKey: ["me"] })
+    } catch {
+      // /api/auth/me failures are recoverable — the layout will refetch and
+      // the route guards will redirect if the new household state is missing.
+    }
     toast.success(message)
     navigate("/app", { replace: true })
   }

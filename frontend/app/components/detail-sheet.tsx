@@ -1,0 +1,68 @@
+import { useEffect, type ReactNode, type RefObject } from "react"
+
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "~/components/ui/sheet"
+import { cn } from "~/lib/utils"
+
+export type DetailSheetProps = {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  labelledById: string
+  title: string
+  description?: string
+  children: ReactNode
+  footer?: ReactNode
+  returnFocusRef?: RefObject<Element | null>
+}
+
+export function DetailSheet({
+  open,
+  onOpenChange,
+  labelledById,
+  title,
+  description,
+  children,
+  footer,
+  returnFocusRef,
+}: DetailSheetProps) {
+  useEffect(() => {
+    if (!open && returnFocusRef?.current instanceof HTMLElement) {
+      const el = returnFocusRef.current
+      window.requestAnimationFrame(() => el.focus())
+    }
+  }, [open, returnFocusRef])
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="bottom"
+        showCloseButton
+        aria-labelledby={labelledById}
+        className={cn(
+          "flex max-h-[min(90dvh,640px)] min-h-0 flex-col gap-0 rounded-t-3xl p-0 sm:max-w-[480px]",
+        )}
+      >
+        <SheetHeader className="shrink-0 border-b border-border pb-4 text-left">
+          <SheetTitle id={labelledById} className="pr-10">
+            {title}
+          </SheetTitle>
+          {description ? <SheetDescription>{description}</SheetDescription> : null}
+        </SheetHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4">
+          {children}
+        </div>
+        {footer ? (
+          <SheetFooter className="shrink-0 border-t border-border bg-popover pb-[max(1rem,env(safe-area-inset-bottom))]">
+            {footer}
+          </SheetFooter>
+        ) : null}
+      </SheetContent>
+    </Sheet>
+  )
+}

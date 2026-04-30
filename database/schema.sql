@@ -15,7 +15,7 @@ CREATE TABLE Brukere (
 -- =========================
 CREATE TABLE Husholdning (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    navn VARCHAR(255) NOT NULL,
+    navn VARCHAR(80) NOT NULL,
     created_at DATETIME NOT NULL
 );
 
@@ -25,7 +25,7 @@ CREATE TABLE Medlemmer (
     user_id BIGINT UNSIGNED NOT NULL,
     rolle ENUM('eier','medlem') NOT NULL,
 
-    UNIQUE (husholdning_id, user_id),
+    UNIQUE KEY uk_medlemmer_user_id (user_id),
 
     FOREIGN KEY (husholdning_id) REFERENCES Husholdning(id),
     FOREIGN KEY (user_id) REFERENCES Brukere(id)

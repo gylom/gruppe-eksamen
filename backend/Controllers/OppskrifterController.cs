@@ -16,7 +16,7 @@ public class OppskrifterController : ControllerBase
     public OppskrifterController(AppDbContext db) => _db = db;
 
     [HttpGet("api/oppskrifter")]
-    public async Task<IActionResult> GetAll([FromQuery] string? sok)
+    public async Task<IActionResult> GetAll([FromQuery] string? sok, [FromQuery] ulong? kategoriId)
     {
         var userId = GetUserId();
         if (userId == null) return Unauthorized();
@@ -25,7 +25,7 @@ public class OppskrifterController : ControllerBase
         var preferenceLookup = await GetPreferenceLookup(userId.Value);
 
         var hiddenIds = preferenceLookup
-            .Where(x => x.Value.Skjul || x.Value.Karakter == 1)
+            .Where(x => x.Value.Skjul)
             .Select(x => x.Key)
             .ToList();
 
@@ -43,6 +43,11 @@ public class OppskrifterController : ControllerBase
                                      || x.Ingredienser.Any(i => i.Varetype!.Navn.ToLower().Contains(search)));
         }
 
+        if (kategoriId.HasValue)
+        {
+            query = query.Where(x => x.KategoriId == kategoriId.Value);
+        }
+
         var recipes = await query.OrderByDescending(x => x.CreatedAt).ToListAsync();
         return Ok(recipes.Select(x => MapRecipe(x, preferenceLookup.GetValueOrDefault(x.Id))).ToList());
     }
@@ -57,7 +62,7 @@ public class OppskrifterController : ControllerBase
         var preferenceLookup = await GetPreferenceLookup(userId.Value);
 
         var hiddenIds = preferenceLookup
-            .Where(x => x.Value.Skjul || x.Value.Karakter == 1)
+            .Where(x => x.Value.Skjul)
             .Select(x => x.Key)
             .ToList();
 
@@ -90,9 +95,14 @@ public class OppskrifterController : ControllerBase
             .Include(x => x.Ingredienser)!.ThenInclude(x => x.Maaleenhet)
             .FirstOrDefaultAsync();
 
-        return item == null
-            ? NotFound(new { message = "Oppskrift ikke funnet." })
-            : Ok(MapRecipe(item, preferenceLookup.GetValueOrDefault(item.Id)));
+        if (item == null)
+            return NotFound(new { message = "Oppskrift ikke funnet." });
+
+        var pref = preferenceLookup.GetValueOrDefault(item.Id);
+        if (pref?.Skjul == true)
+            return NotFound(new { message = "Oppskrift ikke funnet." });
+
+        return Ok(MapRecipe(item, pref));
     }
 
 
@@ -261,16 +271,17 @@ public class OppskrifterController : ControllerBase
     public async Task<IActionResult> Recommended()
     {
         var userId = GetUserId();
-        var householdId = GetHouseholdId();
+        if (userId == null) return Unauthorized();
 
-        if (userId == null || householdId == null)
+        var householdId = await GetHouseholdId(userId.Value);
+        if (householdId == null)
             return BadRequest(new { message = "Manglende bruker/husholdning." });
 
         var visibleOwnerIds = await GetVisibleRecipeOwnerIds(userId.Value);
         var preferenceLookup = await GetPreferenceLookup(userId.Value);
 
         var hiddenIds = preferenceLookup
-            .Where(x => x.Value.Skjul || x.Value.Karakter == 1)
+            .Where(x => x.Value.Skjul)
             .Select(x => x.Key)
             .ToList();
 
@@ -304,15 +315,15 @@ public class OppskrifterController : ControllerBase
                 .ToList();
 
             var pref = preferenceLookup.GetValueOrDefault(r.Id);
-var matchProsent = required.Count == 0
-    ? 100
-    : (int)Math.Round((double)have / required.Count * 100);
+            var matchProsent = required.Count == 0
+                ? 100
+                : (int)Math.Round((double)have / required.Count * 100);
 
-string melding =
-    matchProsent == 100 ? "Alle ingredienser på lager" :
-    matchProsent >= 70 ? "Nesten alle ingredienser på lager" :
-    matchProsent >= 50 ? "Mangler noen ingredienser" :
-    "Du har noen ingredienser på lager";
+            string melding =
+                matchProsent == 100 ? "Alle ingredienser på lager" :
+                matchProsent >= 70 ? "Nesten alle ingredienser på lager" :
+                matchProsent >= 50 ? "Mangler noen ingredienser" :
+                "Du har noen ingredienser på lager";
     
             return new
             {
@@ -388,16 +399,17 @@ string melding =
         return ulong.TryParse(claim, out var id) ? id : null;
     }
 
-    private ulong? GetHouseholdId()
+    private async Task<ulong?> GetHouseholdId(ulong userId)
     {
-        var claim = User.FindFirstValue("householdId");
-        return ulong.TryParse(claim, out var id) ? id : null;
+        return await _db.Medlemmer
+            .Where(x => x.UserId == userId)
+            .Select(x => (ulong?)x.HusholdningId)
+            .FirstOrDefaultAsync();
     }
 
-    private async Task<List<ulong>> GetHouseholdMemberIds()
+    private async Task<List<ulong>> GetHouseholdMemberIds(ulong userId)
     {
-        var householdId = GetHouseholdId();
-
+        var householdId = await GetHouseholdId(userId);
         if (householdId == null)
             return new List<ulong>();
 
@@ -409,7 +421,7 @@ string melding =
 
     private async Task<List<ulong>> GetVisibleRecipeOwnerIds(ulong userId)
     {
-        var householdMemberIds = await GetHouseholdMemberIds();
+        var householdMemberIds = await GetHouseholdMemberIds(userId);
 
         var adminUserIds = await _db.Brukere
             .Where(x => x.Rolle)

@@ -24,7 +24,7 @@ export function BottomNav() {
             to={to}
             className={({ isActive }) =>
               cn(
-                "relative flex min-h-14 min-w-11 flex-col items-center justify-center gap-1 rounded-sm px-1 text-xs text-muted-foreground outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                "relative flex min-h-14 min-w-11 flex-col items-center justify-center gap-1 rounded-sm px-1 text-xs text-muted-foreground transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50",
                 isActive && "font-semibold text-foreground"
               )
             }

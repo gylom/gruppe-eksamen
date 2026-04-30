@@ -2,10 +2,13 @@ using DefaultNamespace.Data;
 using DefaultNamespace.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,6 +62,25 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    // Throttle invite-code submissions to mitigate brute-force enumeration.
+    options.AddPolicy("invite-join", httpContext =>
+    {
+        var key = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                  ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                  ?? "anon";
+        return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+        });
+    });
+});
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("react", policy =>
@@ -80,6 +102,7 @@ app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.MapControllers();
 
 app.MapFallbackToFile("{*path:nonfile:regex(^(?!api(/|$)).*)}", "index.html");
