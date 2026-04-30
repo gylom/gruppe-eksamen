@@ -7,8 +7,9 @@
     "db:reset:win": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-db.ps1",
     "db:reset:linux": "bash ./scripts/setup-db.sh",
     "backend": "cd backend && dotnet run",
-    "frontend": "cd client-react && npm run dev",
+    "frontend": "cd frontend && npm run dev",
     "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "build": "npm run build --prefix frontend && node ./scripts/copy-frontend-to-wwwroot.mjs",
     "start:win": "npm run db:reset:win && npm run dev",
     "start:linux": "npm run db:reset:linux && npm run dev"
   },

@@ -7,3 +7,15 @@ backend/obj/
 .env
 .vscode/
 .idea/
+
+# Frontend production build artifacts copied into backend/wwwroot
+backend/wwwroot/*
+!backend/wwwroot/.gitkeep
+frontend/build/
+frontend/.react-router/
+
+# Local agent/tooling state
+.claude/
+.agents/
+_bmad/
+_bmad-output/

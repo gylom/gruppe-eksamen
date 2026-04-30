@@ -74,7 +74,14 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("react");
+
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+app.MapFallbackToFile("{*path:nonfile:regex(^(?!api(/|$)).*)}", "index.html");
+
 app.Run();

@@ -1,6 +1,7 @@
 using DefaultNamespace.Data;
 using DefaultNamespace.DTOs;
 using DefaultNamespace.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -98,6 +99,33 @@ public class AuthController : ControllerBase
             .FirstOrDefaultAsync(x => x.UserId == bruker.Id);
 
         return Ok(BuildAuthResponse(bruker, membership?.HusholdningId, membership?.Husholdning?.Navn ?? string.Empty));
+    }
+
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<IActionResult> Me()
+    {
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!ulong.TryParse(claim, out var userId))
+            return Unauthorized();
+
+        var bruker = await _db.Brukere.FirstOrDefaultAsync(x => x.Id == userId);
+        if (bruker == null)
+            return Unauthorized();
+
+        var membership = await _db.Medlemmer
+            .Include(x => x.Husholdning)
+            .FirstOrDefaultAsync(x => x.UserId == userId);
+
+        return Ok(new MeResponse
+        {
+            UserId = bruker.Id,
+            Brukernavn = bruker.Brukernavn,
+            Email = bruker.Email,
+            HouseholdId = membership?.HusholdningId,
+            HouseholdName = membership?.Husholdning?.Navn ?? string.Empty,
+            HouseholdRole = membership?.Rolle
+        });
     }
 
     private AuthResponse BuildAuthResponse(Bruker bruker, ulong? householdId, string householdName)
