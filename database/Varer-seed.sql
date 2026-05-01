@@ -58,4 +58,5 @@ INSERT INTO Varer (id, varenavn, varetype_id, merke, kvantitet, maaleenhet_id, e
                                                                                         (41, 'Øl', 37, 'Hansa', 0.5, 3, '100000000041'),
                                                                                         (42, 'Nøtter', 38, 'Den Lille Nøttefabrikken', 0.2, 2, '100000000042'),
                                                                                         (43, 'Kjeks', 39, 'Sætre', 0.25, 2, '100000000043'),
-                                                                                        (44, 'Godteri', 40, 'Nidar', 0.3, 2, '100000000044');
+                                                                                        (44, 'Godteri', 40, 'Nidar', 0.3, 2, '100000000044'),
+                                                                                        (45, 'Helmelk Q - 1,75 liter', 46, 'Q-Meieriene', 1.75, 3, '7048840200979');

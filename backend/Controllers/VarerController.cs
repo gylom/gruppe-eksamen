@@ -26,7 +26,9 @@ public class VarerController : ControllerBase
 
         var query = _db.Varer
             .Where(x => !x.Brukerdefinert || x.UserId == null || householdMemberIds.Contains(x.UserId.Value))
-            .Include(x => x.Varetype)!.ThenInclude(x => x!.Kategori)
+            .Include(x => x.Varetype)!
+    .ThenInclude(x => x!.Kategori)!
+        .ThenInclude(x => x!.Parent)
             .Include(x => x.Maaleenhet)
             .Include(x => x.Butikkpriser)
                 .ThenInclude(x => x.Butikk)
@@ -58,6 +60,10 @@ public class VarerController : ControllerBase
                 varetype = x.Varetype!.Navn,
                 kategori_id = x.Varetype.KategoriId,
                 kategori = x.Varetype.Kategori!.Kategorinavn,
+                hovedkategori_id = x.Varetype.Kategori!.ParentId,
+                hovedkategori = x.Varetype.Kategori.Parent != null
+                    ? x.Varetype.Kategori.Parent.Kategorinavn
+                    : x.Varetype.Kategori.Kategorinavn,
                 merke = x.Merke,
                 kvantitet = x.Kvantitet,
                 maaleenhet_id = x.MaaleenhetId,
@@ -95,7 +101,9 @@ public class VarerController : ControllerBase
 
         var item = await _db.Varer
             .Where(x => x.Id == id && (!x.Brukerdefinert || x.UserId == null || householdMemberIds.Contains(x.UserId.Value)))
-            .Include(x => x.Varetype)!.ThenInclude(x => x!.Kategori)
+            .Include(x => x.Varetype)!
+    .ThenInclude(x => x!.Kategori)!
+        .ThenInclude(x => x!.Parent)
             .Include(x => x.Maaleenhet)
             .Include(x => x.Butikkpriser)
                 .ThenInclude(x => x.Butikk)
@@ -107,6 +115,10 @@ public class VarerController : ControllerBase
                 varetype = x.Varetype!.Navn,
                 kategori_id = x.Varetype.KategoriId,
                 kategori = x.Varetype.Kategori!.Kategorinavn,
+                hovedkategori_id = x.Varetype.Kategori!.ParentId,
+                hovedkategori = x.Varetype.Kategori.Parent != null
+                   ? x.Varetype.Kategori.Parent.Kategorinavn
+                   : x.Varetype.Kategori.Kategorinavn,
                 merke = x.Merke,
                 kvantitet = x.Kvantitet,
                 maaleenhet_id = x.MaaleenhetId,
