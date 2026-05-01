@@ -12,5 +12,6 @@ export default [
     route("groceries", "routes/app/shop.tsx"),
     route("cookbook", "routes/app/book.tsx"),
     route("account", "routes/app/account.tsx"),
+    route("system-view", "routes/app/system-view.tsx"),
   ]),
 ] satisfies RouteConfig

@@ -1,0 +1,16 @@
+**/node_modules
+**/bin
+**/obj
+**/build
+**/.vs
+**/.idea
+**/.vscode
+backend/wwwroot
+.git
+.gitignore
+docs/_archive
+docs/_prompts
+docs/_notes
+client-react
+_bmad
+_bmad-output

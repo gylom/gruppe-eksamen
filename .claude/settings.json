@@ -38,7 +38,13 @@
       "WebFetch(domain:uselayouts.com)",
       "Bash(pnpm tsc *)",
       "Bash(python -c \"import json,sys; print\\(json.dumps\\(json.load\\(sys.stdin\\)['scripts'], indent=2\\)\\)\")",
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "Bash(git merge-tree *)",
+      "Skill(use-railway)",
+      "Skill(use-railway:*)",
+      "Bash(railway status *)",
+      "Bash(railway variables *)",
+      "Bash(gh repo *)"
     ],
     "additionalDirectories": [
       "\\tmp"
