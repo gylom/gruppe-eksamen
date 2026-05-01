@@ -54,20 +54,24 @@ export function SwipeActionRow({
     )
 
   return (
-    <SwipeableList className={cn("swipe-action-row-list", className)} type={Type.IOS} threshold={0.35}>
+    <SwipeableList
+      className={cn("swipe-action-row-list", className)}
+      type={Type.IOS}
+      threshold={0.35}
+    >
       <SwipeableListItem
         blockSwipe={blocked}
         listType={Type.IOS}
         leadingActions={actionSide === "leading" ? swipeActions : undefined}
         trailingActions={actionSide === "trailing" ? swipeActions : undefined}
       >
-        <div className="flex flex-wrap items-start gap-2 border-b border-border py-2 sm:items-center">
+        <div className="flex w-full items-center gap-2 border-b border-border px-3 py-2">
           <div className="min-w-0 flex-1">{children}</div>
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="shrink-0 touch-manipulation"
+            className="ml-auto shrink-0 touch-manipulation"
             disabled={blocked}
             aria-busy={loading}
             aria-label={fallbackAriaLabel}

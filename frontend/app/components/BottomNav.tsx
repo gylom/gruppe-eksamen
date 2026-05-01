@@ -5,10 +5,10 @@ import { NavLink } from "react-router"
 import { cn } from "~/lib/utils"
 
 const navPaths = [
-  { to: "/app/chef", key: "chef" as const, Icon: ChefHat },
-  { to: "/app/plan", key: "plan" as const, Icon: CalendarDays },
-  { to: "/app/shop", key: "shop" as const, Icon: ShoppingBasket },
-  { to: "/app/book", key: "book" as const, Icon: BookOpen },
+  { to: "/app/recipes", key: "chef" as const, Icon: ChefHat },
+  { to: "/app/meals", key: "plan" as const, Icon: CalendarDays },
+  { to: "/app/groceries", key: "shop" as const, Icon: ShoppingBasket },
+  { to: "/app/cookbook", key: "book" as const, Icon: BookOpen },
   { to: "/app/account", key: "account" as const, Icon: User },
 ]
 

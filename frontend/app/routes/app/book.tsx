@@ -1,15 +1,16 @@
 import { useMemo, useRef, useState } from "react"
 import { Link } from "react-router"
-import { CalendarClock, Search, ShoppingBasket, Star } from "lucide-react"
+import { ShoppingBasket } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { DetailSheet } from "~/components/detail-sheet"
+import { Rating } from "~/components/rating"
+import { RouteHeader } from "~/components/route-header"
 import { RouteErrorRetry } from "~/components/route-error-retry"
+import { SearchFilterPopover } from "~/components/search-filter-popover"
 import { cn } from "~/lib/utils"
 import { Button, buttonVariants } from "~/components/ui/button"
-import { Input } from "~/components/ui/input"
-import { Label } from "~/components/ui/label"
 import type { CookbookHistoryItem, CookbookSortMode } from "~/features/cookbook/types"
 import { backendKarakterToStars, useSaveCookbookRating } from "~/features/cookbook/use-save-cookbook-rating"
 import { useCookbookHistory, type CookbookHistoryFilters } from "~/features/cookbook/use-cookbook-history"
@@ -22,25 +23,34 @@ import {
   sortPlanningCategories,
 } from "~/features/planning/constants"
 import { useCreatePlannedMeal } from "~/features/planning/use-planned-meals"
-import { useDebouncedValue, useRecipeCategories } from "~/features/recipes/use-recipes"
-import { getDateLocaleTag } from "~/lib/i18n"
+import { RecipeCard } from "~/features/recipes/recipe-card"
+import { RecipeDetailPanel } from "~/features/recipes/recipe-detail-panel"
+import type { RecipeDto } from "~/features/recipes/types"
+import { useDebouncedValue, useRecipe, useRecipeCategories } from "~/features/recipes/use-recipes"
 
 const BOOK_SEARCH_ID = "book-cookbook-search"
 const BOOK_PLAN_FORM_ID = "book-add-plan-form"
+const BOOK_DETAIL_TITLE_ID = "book-detail-title"
 
-function formatCookbookDate(iso: string, localeTag: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
-  return new Intl.DateTimeFormat(localeTag, { dateStyle: "medium" }).format(d)
+function cookbookItemToRecipeCardProps(item: CookbookHistoryItem): RecipeDto {
+  return {
+    id: item.recipeId,
+    navn: item.recipeName,
+    instruksjoner: "",
+    porsjoner: item.recipePortions,
+    bilde: item.bilde,
+    kategori_id: item.kategoriId,
+    kategori: item.kategori,
+    user_id: 0,
+    karakter: null,
+    kommentar: null,
+    skjul: false,
+    skjultBegrunnelse: null,
+    ingredienser: [],
+  }
 }
 
-const RATING_STEPS = [1, 2, 3, 4, 5] as const
-
-function CookbookRowRating({
-  row,
-}: {
-  row: CookbookHistoryItem
-}) {
+function CookbookRowRating({ row }: { row: CookbookHistoryItem }) {
   const { t } = useTranslation()
   const saveRating = useSaveCookbookRating()
   const stars = backendKarakterToStars(row.currentUserRating)
@@ -56,49 +66,35 @@ function CookbookRowRating({
           <span className="text-foreground">{t("book.notRated")}</span>
         )}
       </p>
-      <div className="flex flex-wrap gap-1.5" aria-describedby={summaryId}>
-        {RATING_STEPS.map((step) => {
-          const selected = stars === step
-          return (
-            <Button
-              key={step}
-              type="button"
-              size="sm"
-              variant={selected ? "secondary" : "outline"}
-              className="h-9 min-w-9 gap-1 px-2 sm:h-8 sm:min-w-8"
-              disabled={saveRating.isPending}
-              aria-pressed={selected}
-              aria-label={t("book.rateAria", { recipe: row.recipeName, step })}
-              onClick={() =>
-                saveRating.mutate(
-                  { recipeId: row.recipeId, stars: step },
-                  {
-                    onSuccess: () => toast.success(t("book.ratingSaved")),
-                    onError: () => toast.error(t("book.ratingError")),
-                  },
-                )
-              }
-            >
-              <Star className="size-3.5 shrink-0" aria-hidden fill={selected ? "currentColor" : "none"} />
-              <span className="tabular-nums">{step}</span>
-            </Button>
+      <Rating
+        rate={stars ?? 0}
+        disabled={saveRating.isPending}
+        ariaLabelForStar={(step) => t("book.rateAria", { recipe: row.recipeName, step })}
+        onRate={(step) =>
+          saveRating.mutate(
+            { recipeId: row.recipeId, stars: step },
+            {
+              onSuccess: () => toast.success(t("book.ratingSaved")),
+              onError: () => toast.error(t("book.ratingError")),
+            },
           )
-        })}
-      </div>
+        }
+      />
     </fieldset>
   )
 }
 
 export default function BookRoute() {
-  const { t, i18n } = useTranslation()
-  const dateLoc = getDateLocaleTag(i18n.language)
+  const { t } = useTranslation()
   const [search, setSearch] = useState("")
   const debouncedSearch = useDebouncedValue(search, 300)
   const trimmed = debouncedSearch.trim()
   const [mealTypeId, setMealTypeId] = useState<number | null>(null)
   const [sort, setSort] = useState<CookbookSortMode>("ratingThenRecent")
+  const [panelOpen, setPanelOpen] = useState(false)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<CookbookHistoryItem | null>(null)
+  const [showPlanForm, setShowPlanForm] = useState(false)
 
   const filters: CookbookHistoryFilters = useMemo(
     () => ({
@@ -113,6 +109,7 @@ export default function BookRoute() {
   const householdQuery = useHousehold()
   const categoriesQuery = useRecipeCategories()
   const createPlannedMealMutation = useCreatePlannedMeal()
+  const detailQuery = useRecipe(selectedItem?.recipeId ?? null, sheetOpen && selectedItem != null)
 
   const returnFocusRef = useRef<HTMLButtonElement | null>(null)
 
@@ -139,122 +136,80 @@ export default function BookRoute() {
     setMealTypeId(null)
   }
 
-  function openPlanSheet(row: CookbookHistoryItem, trigger: HTMLButtonElement) {
+  function openDetailSheet(row: CookbookHistoryItem, trigger: HTMLButtonElement) {
     returnFocusRef.current = trigger
     setSelectedItem(row)
+    setShowPlanForm(false)
     setSheetOpen(true)
   }
 
-  const sheetDescription =
-    selectedItem != null
-      ? t("book.sheetMeta", {
-          mealType: selectedItem.mealType,
-          count: selectedItem.cookedCount,
-        })
-      : undefined
+  const detailTitle = detailQuery.data?.navn ?? selectedItem?.recipeName ?? t("book.addToPlan")
+  const detailDescription =
+    detailQuery.data != null
+      ? [detailQuery.data.kategori, `${detailQuery.data.porsjoner} porsjoner`]
+          .filter(Boolean)
+          .join(" · ")
+      : selectedItem != null
+        ? t("book.sheetMeta", { mealType: selectedItem.mealType, count: selectedItem.cookedCount })
+        : undefined
 
   return (
-    <section className="p-4" aria-labelledby="book-heading">
-      <div className="space-y-1">
-        <h1 id="book-heading" className="font-heading text-xl font-semibold tracking-tight">
-          {t("book.title")}
-        </h1>
-        <p className="text-sm text-muted-foreground">{t("book.subtitle")}</p>
-      </div>
-
-      <div className="mt-5 space-y-3">
-        <Label htmlFor={BOOK_SEARCH_ID} className="text-foreground">
-          {t("book.searchLabel")}
-        </Label>
-        <div className="relative">
-          <Search
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <Input
-            id={BOOK_SEARCH_ID}
-            type="search"
-            autoComplete="off"
-            placeholder={t("book.searchPlaceholder")}
-            className="pl-10"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div
-          className="flex min-w-0 flex-wrap gap-1.5"
-          role="group"
-          aria-label={t("book.filterMealType")}
-        >
-          <Button
-            type="button"
-            size="sm"
-            variant={mealTypeId == null ? "default" : "outline"}
-            className="shrink-0"
-            aria-pressed={mealTypeId == null}
-            onClick={() => setMealTypeId(null)}
-          >
-            {t("book.all")}
-          </Button>
-          {categoriesQuery.isLoading ? (
-            <span className="text-xs text-muted-foreground">{t("common.loading")}</span>
-          ) : null}
-          {planningMealCategories.map((c) => {
-            const selected = mealTypeId === c.id
-            const chipSuffix = selected ? t("book.filterSelectedSuffix") : ""
-            return (
-              <Button
-                key={c.id}
-                type="button"
-                size="sm"
-                variant={selected ? "default" : "outline"}
-                className="max-w-[9rem] shrink truncate"
-                aria-pressed={selected}
-                aria-label={t("book.filterChipAria", {
-                  type: t("book.filterChipType"),
-                  name: c.navn,
-                  selectedSuffix: chipSuffix,
-                })}
-                onClick={() => setMealTypeId(selected ? null : c.id)}
+    <section className="px-4 pb-4" aria-labelledby="book-heading">
+      <RouteHeader
+        title={t("book.title")}
+        titleId="book-heading"
+        action={
+          <SearchFilterPopover
+            open={panelOpen}
+            onOpenChange={setPanelOpen}
+            hasActiveFilters={hasActiveFilters}
+            searchId={BOOK_SEARCH_ID}
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder={t("book.searchPlaceholder")}
+            searchAriaLabel={t("book.searchLabel")}
+            categories={planningMealCategories}
+            selectedCategoryId={mealTypeId}
+            onSelectCategoryId={setMealTypeId}
+            categoryGroupAriaLabel={t("book.filterMealType")}
+            allLabel={t("book.all")}
+            chipAriaTemplate={(args) => t("book.filterChipAria", args)}
+            chipAriaType={t("book.filterChipType")}
+            selectedChipSuffix={t("book.filterSelectedSuffix")}
+            categoriesLoading={categoriesQuery.isLoading}
+            categoriesLoadingLabel={t("common.loading")}
+            triggerAriaLabel={t("book.searchLabel")}
+            extra={
+              <div
+                className="flex flex-wrap gap-2"
+                role="group"
+                aria-label={t("book.sortAria")}
               >
-                {c.navn}
-              </Button>
-            )
-          })}
-        </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={sort === "ratingThenRecent" ? "default" : "outline"}
+                  aria-pressed={sort === "ratingThenRecent"}
+                  onClick={() => setSort("ratingThenRecent")}
+                >
+                  {t("book.sortRating")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={sort === "recent" ? "default" : "outline"}
+                  aria-pressed={sort === "recent"}
+                  onClick={() => setSort("recent")}
+                >
+                  {t("book.sortRecent")}
+                </Button>
+              </div>
+            }
+          />
+        }
+      />
 
-        <div
-          className="flex shrink-0 gap-1 rounded-xl border border-border p-1"
-          role="group"
-          aria-label={t("book.sortAria")}
-        >
-          <Button
-            type="button"
-            size="sm"
-            variant={sort === "ratingThenRecent" ? "secondary" : "ghost"}
-            className="h-8 px-2 text-xs"
-            aria-pressed={sort === "ratingThenRecent"}
-            onClick={() => setSort("ratingThenRecent")}
-          >
-            {t("book.sortRating")}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={sort === "recent" ? "secondary" : "ghost"}
-            className="h-8 px-2 text-xs"
-            aria-pressed={sort === "recent"}
-            onClick={() => setSort("recent")}
-          >
-            {t("book.sortRecent")}
-          </Button>
-        </div>
-      </div>
-
-      <div className="mt-6 space-y-3" aria-live="polite">
+      <div className="mx-auto mt-6 max-w-2xl space-y-3" aria-live="polite">
         {cookbookQuery.isError ? (
           <RouteErrorRetry
             title={t("book.loadError")}
@@ -266,11 +221,14 @@ export default function BookRoute() {
         ) : null}
 
         {cookbookQuery.isFetching && items == null ? (
-          <ul className="space-y-3" aria-label={t("book.loadingCookbook")}>
-            {[0, 1, 2].map((i) => (
+          <ul
+            className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2"
+            aria-label={t("book.loadingCookbook")}
+          >
+            {[0, 1, 2, 3, 4, 5].map((i) => (
               <li
                 key={i}
-                className="h-[5.75rem] animate-pulse rounded-2xl border border-border bg-muted/80"
+                className="h-[5.5rem] animate-pulse rounded-2xl border border-border bg-muted/80 min-[400px]:h-[13rem]"
               />
             ))}
           </ul>
@@ -283,13 +241,13 @@ export default function BookRoute() {
               <p className="mt-4 text-sm font-medium text-foreground">{t("book.emptyTitle")}</p>
               <p className="mt-2 max-w-sm text-sm text-muted-foreground">{t("book.emptyHint")}</p>
               <Link
-                to="/app/shop"
+                to="/app/groceries"
                 className={cn(buttonVariants({ variant: "default" }), "mt-5 inline-flex w-full max-w-xs justify-center no-underline")}
               >
                 {t("book.emptyCta")}
               </Link>
               <Link
-                to="/app/plan"
+                to="/app/meals"
                 className={cn(
                   buttonVariants({ variant: "secondary" }),
                   "mt-2 inline-flex w-full max-w-xs justify-center no-underline",
@@ -298,7 +256,7 @@ export default function BookRoute() {
                 {t("shop.emptyGotoPlan")}
               </Link>
               <Link
-                to="/app/chef"
+                to="/app/recipes"
                 className={cn(
                   buttonVariants({ variant: "outline" }),
                   "mt-2 inline-flex w-full max-w-xs justify-center no-underline",
@@ -321,44 +279,17 @@ export default function BookRoute() {
         ) : null}
 
         {items != null && items.length > 0 ? (
-          <ul className="space-y-3">
+          <ul className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
             {items.map((row) => (
-              <li key={`${row.recipeId}-${row.mealTypeId}`}>
-                <article className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-                  <div className="flex flex-col gap-3">
-                    <div>
-                      <h2 className="text-base font-semibold leading-snug text-foreground">
-                        {row.recipeName}
-                      </h2>
-                      <p className="mt-1 text-sm text-muted-foreground">{row.mealType}</p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5">
-                        <CalendarClock className="size-3.5 shrink-0" aria-hidden />
-                        <span>
-                          {t("book.lastCooked", {
-                            date: formatCookbookDate(row.lastCookedAt, dateLoc),
-                          })}
-                        </span>
-                      </span>
-                      <span aria-label={t("book.cookedAria", { count: row.cookedCount })}>
-                        · {t("book.cookedLabel", { count: row.cookedCount })}
-                      </span>
-                    </div>
-
-                    <CookbookRowRating row={row} />
-
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="w-full sm:w-auto"
-                      onClick={(e) => openPlanSheet(row, e.currentTarget)}
-                    >
-                      {t("book.planAgain")}
-                    </Button>
-                  </div>
-                </article>
+              <li
+                key={`${row.recipeId}-${row.mealTypeId}`}
+                className="flex flex-col gap-2"
+              >
+                <RecipeCard
+                  recipe={cookbookItemToRecipeCardProps(row)}
+                  onClick={(e) => openDetailSheet(row, e.currentTarget)}
+                />
+                <CookbookRowRating row={row} />
               </li>
             ))}
           </ul>
@@ -369,14 +300,17 @@ export default function BookRoute() {
         open={sheetOpen}
         onOpenChange={(open) => {
           setSheetOpen(open)
-          if (!open) setSelectedItem(null)
+          if (!open) {
+            setSelectedItem(null)
+            setShowPlanForm(false)
+          }
         }}
-        labelledById="book-add-plan-sheet-title"
-        title={selectedItem?.recipeName ?? t("book.addToPlan")}
-        description={sheetDescription}
+        labelledById={BOOK_DETAIL_TITLE_ID}
+        title={detailTitle}
+        description={detailDescription}
         returnFocusRef={returnFocusRef}
         footer={
-          selectedItem != null ? (
+          detailQuery.data != null && showPlanForm ? (
             <div className="flex w-full gap-2">
               <Button
                 type="button"
@@ -384,9 +318,9 @@ export default function BookRoute() {
                 className="flex-1"
                 size="lg"
                 disabled={createPlannedMealMutation.isPending}
-                onClick={() => setSheetOpen(false)}
+                onClick={() => setShowPlanForm(false)}
               >
-                {t("common.cancel")}
+                {t("common.back")}
               </Button>
               <Button
                 type="submit"
@@ -398,24 +332,68 @@ export default function BookRoute() {
                 {t("common.saveToPlan")}
               </Button>
             </div>
-          ) : null
+          ) : (
+            <Button
+              type="button"
+              className="w-full"
+              size="lg"
+              disabled={detailQuery.data == null}
+              onClick={() => setShowPlanForm(true)}
+            >
+              {t("book.planAgain")}
+            </Button>
+          )
         }
       >
-        {selectedItem != null ? (
+        {detailQuery.isLoading ? (
+          <div
+            className="space-y-4 py-2"
+            aria-busy="true"
+            aria-label={t("chef.loadingDetailLabel")}
+          >
+            <div className="h-40 animate-pulse rounded-2xl bg-muted" />
+            <div className="h-4 w-3/5 animate-pulse rounded bg-muted" />
+            <div className="h-4 w-full animate-pulse rounded bg-muted" />
+            <div className="h-4 w-4/5 animate-pulse rounded bg-muted" />
+          </div>
+        ) : null}
+        {detailQuery.isError ? (
+          <div
+            className="rounded-xl border border-destructive/30 bg-destructive/5 p-4"
+            role="alert"
+          >
+            <p className="text-sm font-medium text-foreground">
+              {t("chef.detailLoadError")}
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              className="mt-3"
+              onClick={() => void detailQuery.refetch()}
+            >
+              {t("common.retry")}
+            </Button>
+          </div>
+        ) : null}
+        {detailQuery.data != null && showPlanForm ? (
           <AddToPlanPanel
-            key={`${selectedItem.recipeId}-${selectedItem.mealTypeId}`}
+            key={detailQuery.data.id}
             formId={BOOK_PLAN_FORM_ID}
-            recipeId={selectedItem.recipeId}
-            recipePortions={selectedItem.recipePortions}
+            recipeId={detailQuery.data.id}
+            recipePortions={detailQuery.data.porsjoner}
             householdMemberCount={householdMemberCount}
             mealCategories={planningMealCategories}
             createMutation={createPlannedMealMutation}
             onSaved={() => {
               toast.success(t("book.planSavedToast"))
               setSheetOpen(false)
+              setShowPlanForm(false)
               setSelectedItem(null)
             }}
           />
+        ) : null}
+        {detailQuery.data != null && !showPlanForm ? (
+          <RecipeDetailPanel recipe={detailQuery.data} />
         ) : null}
       </DetailSheet>
     </section>

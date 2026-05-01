@@ -41,7 +41,7 @@ export default function App() {
     <ThemeProvider defaultTheme="system">
       <QueryClientProvider client={queryClient}>
         <Outlet />
-        <Toaster />
+        <Toaster position="top-center" />
       </QueryClientProvider>
     </ThemeProvider>
   )

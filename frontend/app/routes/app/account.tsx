@@ -3,6 +3,7 @@ import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
+import { RouteHeader } from "~/components/route-header"
 import { Button } from "~/components/ui/button"
 import {
   Dialog,
@@ -115,11 +116,11 @@ export default function AccountRoute() {
   }
 
   return (
-    <section className="space-y-8 p-4 pb-10">
-      <header className="space-y-1">
-        <h1 className="font-heading text-xl font-semibold tracking-tight">{t("account.pageTitle")}</h1>
-        <p className="text-sm text-muted-foreground">{t("account.pageSubtitle")}</p>
-      </header>
+    <section className="space-y-8 px-4 pb-10">
+      <RouteHeader
+        title={t("account.pageTitle")}
+        subtitle={t("account.pageSubtitle")}
+      />
 
       <SettingSection title={t("account.userSection")}>
         <div className="space-y-2 text-sm">

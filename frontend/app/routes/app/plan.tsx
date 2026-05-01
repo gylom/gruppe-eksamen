@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from "react"
-import { ChevronLeft, ChevronRight, ListChecks } from "lucide-react"
+import {
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  ListChecks,
+  Loader2,
+} from "lucide-react"
 import { Link } from "react-router"
 import type { TFunction } from "i18next"
 import { useTranslation } from "react-i18next"
@@ -7,6 +13,7 @@ import { toast } from "sonner"
 
 import { SwipeActionRow } from "~/components/SwipeActionRow"
 import { DetailSheet } from "~/components/detail-sheet"
+import { RouteHeader } from "~/components/route-header"
 import { RouteErrorRetry } from "~/components/route-error-retry"
 import { Button, buttonVariants } from "~/components/ui/button"
 import { Checkbox } from "~/components/ui/checkbox"
@@ -89,6 +96,14 @@ export default function PlanRoute() {
     formatWeekRangeTitle(mondayKey, dateLoc)
   const wdShort = (dayNumber: number) => weekdayShort(dayNumber, dateLoc)
   const [weekMonday, setWeekMonday] = useState(() => getMondayKeyContaining())
+  const todayMonday = useMemo(() => getMondayKeyContaining(), [])
+  const todayKey = useMemo(() => {
+    const now = new Date()
+    const mm = String(now.getMonth() + 1).padStart(2, "0")
+    const dd = String(now.getDate()).padStart(2, "0")
+    return `${now.getFullYear()}-${mm}-${dd}`
+  }, [])
+  const isAtCurrentWeek = weekMonday <= todayMonday
   const mealsQuery = usePlannedMeals(weekMonday)
   const categoriesQuery = useRecipeCategories()
   const updateServingsMutation = useUpdatePlannedMealServings()
@@ -125,7 +140,29 @@ export default function PlanRoute() {
     }))
   }, [categoriesQuery.data, t])
 
-  const weekDays = useMemo(() => expandWeekFromMonday(weekMonday), [weekMonday])
+  const allWeekDays = useMemo(
+    () => expandWeekFromMonday(weekMonday),
+    [weekMonday]
+  )
+  const [showPastDays, setShowPastDays] = useState(false)
+  const hiddenPastDayCount = useMemo(
+    () =>
+      weekMonday === todayMonday
+        ? allWeekDays.filter((d) => d.dateKey < todayKey).length
+        : 0,
+    [allWeekDays, weekMonday, todayMonday, todayKey]
+  )
+  const weekDays = useMemo(
+    () =>
+      hiddenPastDayCount > 0 && !showPastDays
+        ? allWeekDays.filter((d) => d.dateKey >= todayKey)
+        : allWeekDays,
+    [allWeekDays, hiddenPastDayCount, showPastDays, todayKey]
+  )
+
+  useEffect(() => {
+    setShowPastDays(false)
+  }, [weekMonday])
 
   const editingMealId = editingMeal?.id
 
@@ -339,32 +376,30 @@ export default function PlanRoute() {
             : `${suggestionReview.suggestions.length} ${t("shop.rowPlural")}`
         }`
 
+  const showGenerateSuggestions =
+    mealsQuery.data != null && mealsQuery.data.length > 0
+  const showingPlaceholderWeek = mealsQuery.isPlaceholderData
+
   return (
-    <section className="p-4 pb-28" aria-labelledby="plan-heading">
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1
-              id="plan-heading"
-              className="font-heading text-xl font-semibold tracking-tight"
-            >
-              {t("plan.title")}
-            </h1>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {t("plan.mondayLine", { date: weekMonday })}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+    <section className="px-4 pb-28" aria-label={t("plan.title")}>
+      <RouteHeader
+        leading={
+          <div
+            className="flex items-center gap-1.5 sm:gap-2"
+            role="group"
+            aria-label={t("plan.addToPlanWeekLabel")}
+          >
             <Button
               type="button"
               size="icon"
               variant="outline"
               aria-label={t("plan.prevWeek")}
+              disabled={isAtCurrentWeek}
               onClick={() => setWeekMonday((k) => addWeeksToMondayKey(k, -1))}
             >
               <ChevronLeft className="size-5" aria-hidden />
             </Button>
-            <p className="min-w-[10rem] flex-1 text-center text-sm font-medium tabular-nums">
+            <p className="min-w-[8.5rem] shrink-0 text-center text-sm font-semibold whitespace-nowrap text-foreground tabular-nums sm:min-w-[10rem]">
               {weekTitle(weekMonday)}
             </p>
             <Button
@@ -377,29 +412,40 @@ export default function PlanRoute() {
               <ChevronRight className="size-5" aria-hidden />
             </Button>
           </div>
-        </div>
-        {mealsQuery.data != null && mealsQuery.data.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3 sm:border-t-0 sm:pt-0">
+        }
+        aside={
+          showGenerateSuggestions ? (
             <Button
               type="button"
-              variant="secondary"
               size="sm"
+              className="max-w-full shrink-0 gap-1.5 px-2.5 sm:px-3"
               disabled={
                 generateShoppingSuggestions.isPending || mealsQuery.isFetching
               }
               aria-busy={generateShoppingSuggestions.isPending}
+              aria-label={
+                generateShoppingSuggestions.isPending
+                  ? t("plan.generating")
+                  : t("plan.generateSuggestions")
+              }
               onClick={() => void runGenerateShoppingSuggestions()}
             >
-              {generateShoppingSuggestions.isPending
-                ? t("plan.generating")
-                : t("plan.generateSuggestions")}
+              {generateShoppingSuggestions.isPending ? (
+                <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+              ) : (
+                <ClipboardList className="size-4 shrink-0" aria-hidden />
+              )}
+              <span className="hidden min-w-0 text-left text-xs leading-tight font-medium sm:inline sm:text-sm">
+                {generateShoppingSuggestions.isPending
+                  ? t("plan.generating")
+                  : t("plan.generateSuggestions")}
+              </span>
             </Button>
-            <span className="text-xs text-muted-foreground">
-              {t("plan.generateHint")}
-            </span>
-          </div>
-        ) : null}
-      </header>
+          ) : (
+            <span className="inline-flex size-9 shrink-0" aria-hidden />
+          )
+        }
+      />
 
       <div className="mt-6 space-y-4" aria-live="polite">
         {mealsQuery.isError ? (
@@ -424,17 +470,45 @@ export default function PlanRoute() {
         ) : null}
 
         {mealsQuery.data != null ? (
-          <ul className="space-y-4">
+          <ul
+            className={cn(
+              "space-y-3 transition-opacity duration-150",
+              showingPlaceholderWeek ? "opacity-60" : "opacity-100"
+            )}
+            aria-busy={showingPlaceholderWeek}
+          >
             {weekDays.map((d) => {
               const dom = Number(d.dateKey.slice(8, 10))
               const wd = wdShort(d.dayNumber)
+              const isToday = d.dateKey === todayKey
+              const isPastDay = d.dateKey < todayKey
               return (
-                <li key={d.dateKey}>
-                  <article className="rounded-2xl border border-border bg-card p-3 shadow-sm">
-                    <h2 className="text-sm font-semibold text-foreground">
-                      {wd} {dom}.
+                <li key={d.dateKey} className="scroll-mt-20">
+                  <article
+                    className={cn(
+                      "rounded-2xl border bg-card p-2.5 shadow-sm",
+                      isToday
+                        ? "border-primary/60 ring-1 ring-primary/40"
+                        : "border-border",
+                      isPastDay ? "opacity-60" : ""
+                    )}
+                  >
+                    <h2
+                      className={cn(
+                        "flex items-center gap-2 px-1 text-sm font-semibold",
+                        isPastDay ? "text-muted-foreground" : "text-foreground"
+                      )}
+                    >
+                      <span>
+                        {wd} {dom}.
+                      </span>
+                      {isToday ? (
+                        <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium tracking-wide text-primary uppercase">
+                          {t("plan.today")}
+                        </span>
+                      ) : null}
                     </h2>
-                    <ul className="mt-3 space-y-2">
+                    <ul className="mt-2 grid grid-cols-2 gap-1.5">
                       {planningCategories.map((mt) => {
                         const meal = mealForSlot(d.dayNumber, mt.id)
                         const ariaEmpty = t("plan.addSlotAria", {
@@ -442,23 +516,58 @@ export default function PlanRoute() {
                           day: wd,
                         })
                         if (!meal) {
+                          if (isPastDay) {
+                            return (
+                              <li key={mt.id}>
+                                <div
+                                  aria-label={t("plan.pastDaySlotAria", {
+                                    meal: mt.navn,
+                                    day: wd,
+                                  })}
+                                  aria-disabled
+                                  className={cn(
+                                    buttonVariants({
+                                      variant: "outline",
+                                      size: "sm",
+                                    }),
+                                    "pointer-events-none h-9 w-full cursor-not-allowed justify-between gap-2 border-dashed px-3 text-left text-xs font-normal text-muted-foreground/60 opacity-50"
+                                  )}
+                                >
+                                  <span className="truncate">{mt.navn}</span>
+                                </div>
+                              </li>
+                            )
+                          }
                           return (
                             <li key={mt.id}>
                               <Link
-                                to="/app/chef"
+                                to={{
+                                  pathname: "/app/recipes",
+                                  search: `?kategoriId=${mt.id}&day=${d.dayNumber}&weekStart=${weekMonday}`,
+                                }}
                                 aria-label={ariaEmpty}
+                                aria-disabled={showingPlaceholderWeek}
+                                tabIndex={
+                                  showingPlaceholderWeek ? -1 : undefined
+                                }
+                                onClick={(e) => {
+                                  if (showingPlaceholderWeek) e.preventDefault()
+                                }}
                                 className={cn(
                                   buttonVariants({
                                     variant: "outline",
                                     size: "sm",
                                   }),
-                                  "h-auto min-h-11 w-full justify-start px-3 py-2 text-left font-normal"
+                                  "h-9 w-full justify-between gap-2 border-dashed px-3 text-left text-xs font-normal text-muted-foreground",
+                                  showingPlaceholderWeek
+                                    ? "pointer-events-none"
+                                    : ""
                                 )}
                               >
-                                <span className="text-muted-foreground">
-                                  {mt.navn} ·{" "}
+                                <span className="truncate">{mt.navn}</span>
+                                <span aria-hidden className="opacity-60">
+                                  +
                                 </span>
-                                <span>{t("plan.slotEmptyLine")}</span>
                               </Link>
                             </li>
                           )
@@ -472,18 +581,20 @@ export default function PlanRoute() {
                             <Button
                               type="button"
                               variant="secondary"
-                              className="h-auto min-h-11 w-full flex-col items-start gap-0.5 px-3 py-2 text-left font-normal"
+                              size="sm"
+                              className="h-9 w-full justify-start gap-2 px-3 text-left text-xs font-normal"
                               aria-label={ariaEdit}
+                              disabled={showingPlaceholderWeek}
                               onClick={() => setEditingMeal(meal)}
                             >
-                              <span className="text-xs text-muted-foreground">
+                              <span className="shrink-0 text-muted-foreground">
                                 {meal.mealType}
                               </span>
-                              <span className="font-medium text-foreground">
+                              <span className="min-w-0 flex-1 truncate font-medium text-foreground">
                                 {meal.oppskriftNavn}
                               </span>
-                              <span className="text-xs text-muted-foreground">
-                                {t("plan.servings", { n: meal.servings })}
+                              <span className="shrink-0 text-muted-foreground tabular-nums">
+                                {meal.servings}p
                               </span>
                             </Button>
                           </li>
@@ -497,6 +608,22 @@ export default function PlanRoute() {
           </ul>
         ) : null}
 
+        {mealsQuery.data != null &&
+        weekMonday === todayMonday &&
+        hiddenPastDayCount > 0 ? (
+          <div className="flex justify-center pt-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs text-muted-foreground"
+              onClick={() => setShowPastDays((v) => !v)}
+            >
+              {showPastDays ? t("plan.hidePastDays") : t("plan.showPastDays")}
+            </Button>
+          </div>
+        ) : null}
+
         {!mealsQuery.isFetching &&
         mealsQuery.data != null &&
         mealsQuery.data.length === 0 ? (
@@ -508,7 +635,7 @@ export default function PlanRoute() {
               {t("plan.emptyWeekBody")}
             </p>
             <Link
-              to="/app/chef"
+              to="/app/recipes"
               className={cn(
                 buttonVariants({ variant: "secondary" }),
                 "mt-4 inline-flex w-full justify-center sm:w-auto"
@@ -518,7 +645,7 @@ export default function PlanRoute() {
             </Link>
             <p className="mt-4 text-sm text-muted-foreground">
               {t("plan.emptyBefore")}{" "}
-              <Link className="underline underline-offset-2" to="/app/chef">
+              <Link className="underline underline-offset-2" to="/app/recipes">
                 {t("plan.emptyChef")}
               </Link>
               .

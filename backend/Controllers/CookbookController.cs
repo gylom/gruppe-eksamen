@@ -63,6 +63,7 @@ public class CookbookController : ControllerBase
         var meals = await _db.PlanlagteMaaltider
             .Where(pm => pmIds.Contains(pm.Id) && pm.HusholdningId == householdId.Value)
             .Include(pm => pm.Oppskrift)
+                .ThenInclude(o => o!.Kategori)
             .Include(pm => pm.Maaltidstype)
             .AsSplitQuery()
             .ToListAsync();
@@ -76,7 +77,10 @@ public class CookbookController : ControllerBase
             ulong MealTypeId,
             string RecipeName,
             string MealTypeName,
-            int Portions)>();
+            int Portions,
+            string? Bilde,
+            ulong? KategoriId,
+            string? KategoriNavn)>();
 
         foreach (var (pmId, archivedAt) in pmArchivedPairs)
         {
@@ -91,7 +95,10 @@ public class CookbookController : ControllerBase
                 pm.MaaltidstypeId,
                 pm.Oppskrift.Navn,
                 pm.Maaltidstype.Navn,
-                pm.Oppskrift.Porsjoner));
+                pm.Oppskrift.Porsjoner,
+                pm.Oppskrift.Bilde,
+                pm.Oppskrift.KategoriId,
+                pm.Oppskrift.Kategori?.Navn));
         }
 
         if (enriched.Count == 0)
@@ -124,6 +131,9 @@ public class CookbookController : ControllerBase
                 LastCookedAt = lastCooked,
                 CurrentUserRating = preference?.Karakter,
                 RecipePortions = first.Portions,
+                Bilde = first.Bilde,
+                KategoriId = first.KategoriId,
+                Kategori = first.KategoriNavn,
             });
         }
 

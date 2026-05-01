@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
 
 import { apiFetch } from "~/lib/api-fetch"
 import { isMondayKey } from "~/lib/dates"
@@ -13,6 +18,7 @@ export function usePlannedMeals(weekStartDate: string | null) {
         `/api/planlagte-maaltider?weekStartDate=${encodeURIComponent(weekStartDate!)}`,
       ),
     enabled: weekStartDate != null && isMondayKey(weekStartDate),
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -103,9 +109,18 @@ export function useDeletePlannedMeal() {
     mutationFn: ({ id }: DeletePlannedMealVars) =>
       apiFetch<null>(`/api/planlagte-maaltider/${id}`, { method: "DELETE" }),
     onSuccess: async (_data, variables) => {
-      await queryClient.invalidateQueries({
-        queryKey: ["planned-meals", variables.weekStartDate],
-      })
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["planned-meals", variables.weekStartDate],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["shopping-list"] }),
+        queryClient.invalidateQueries({
+          queryKey: ["shopping-list", "purchased"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["shopping-list", "completion-preview"],
+        }),
+      ])
     },
   })
 }

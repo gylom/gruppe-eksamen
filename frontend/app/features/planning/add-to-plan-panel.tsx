@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import type { UseMutationResult } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
@@ -13,6 +13,7 @@ import {
   getMondayKeyContaining,
   weekdayShort,
 } from "~/lib/dates"
+import { ApiError } from "~/lib/api-fetch"
 import { getDateLocaleTag } from "~/lib/i18n"
 
 import type { CreatePlannedMealBody, PlannedMealDto } from "./types"
@@ -35,6 +36,9 @@ export type AddToPlanPanelProps = {
   recipePortions: number
   householdMemberCount: number | null
   mealCategories: RecipeCategoryDto[]
+  initialDay?: number | null
+  initialWeekStart?: string | null
+  initialMealTypeId?: number | null
   createMutation: UseMutationResult<
     PlannedMealDto,
     Error,
@@ -43,24 +47,55 @@ export type AddToPlanPanelProps = {
   onSaved: () => void
 }
 
+function initialWeekOffset(initialWeekStart: string | null | undefined): number {
+  if (!initialWeekStart) return 0
+  const today = getMondayKeyContaining()
+  if (initialWeekStart === today) return 0
+  if (initialWeekStart === addWeeksToMondayKey(today, 1)) return 1
+  return 0
+}
+
 export function AddToPlanPanel({
   formId,
   recipeId,
   recipePortions,
   householdMemberCount,
   mealCategories,
+  initialDay,
+  initialWeekStart,
+  initialMealTypeId,
   createMutation,
   onSaved,
 }: AddToPlanPanelProps) {
   const { t, i18n } = useTranslation()
   const dateLoc = getDateLocaleTag(i18n.language)
-  const [weekOffset, setWeekOffset] = useState(0)
-  const [day, setDay] = useState(() =>
-    defaultDayNumberForWeek(getMondayKeyContaining())
+  const [weekOffset, setWeekOffset] = useState(() =>
+    initialWeekOffset(initialWeekStart)
   )
-  const [mealTypeId, setMealTypeId] = useState(() =>
-    pickDefaultMealTypeId(mealCategories)
-  )
+  const [day, setDay] = useState(() => {
+    if (
+      initialDay != null &&
+      Number.isInteger(initialDay) &&
+      initialDay >= 1 &&
+      initialDay <= 7
+    ) {
+      return initialDay
+    }
+    const wm = addWeeksToMondayKey(
+      getMondayKeyContaining(),
+      initialWeekOffset(initialWeekStart)
+    )
+    return defaultDayNumberForWeek(wm)
+  })
+  const [mealTypeId, setMealTypeId] = useState(() => {
+    if (
+      initialMealTypeId != null &&
+      mealCategories.some((c) => c.id === initialMealTypeId)
+    ) {
+      return initialMealTypeId
+    }
+    return pickDefaultMealTypeId(mealCategories)
+  })
   const [servings, setServings] = useState(() =>
     clampServings(householdMemberCount ?? recipePortions ?? 4)
   )
@@ -73,8 +108,15 @@ export function AddToPlanPanel({
     weekOffset
   )
   const weekDays = expandWeekFromMonday(selectedMondayKey)
+  const selectedDay = weekDays.find((d) => d.dayNumber === day)
+  const selectedMealType =
+    sortedCategories.find((c) => c.id === mealTypeId)?.navn ??
+    t("common.mealFallback", { id: mealTypeId })
 
+  const prevWeekOffset = useRef(weekOffset)
   useEffect(() => {
+    if (prevWeekOffset.current === weekOffset) return
+    prevWeekOffset.current = weekOffset
     const wm = addWeeksToMondayKey(getMondayKeyContaining(), weekOffset)
     setDay(defaultDayNumberForWeek(wm))
   }, [weekOffset])
@@ -105,7 +147,21 @@ export function AddToPlanPanel({
         servings,
       })
       onSaved()
-    } catch {
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        const dayLabel = selectedDay
+          ? `${weekdayShort(selectedDay.dayNumber, dateLoc)} ${Number(
+              selectedDay.dateKey.slice(8, 10)
+            )}`
+          : t("plan.addToPlanDayFallback")
+        setLocalError(
+          t("plan.addToPlanSlotTaken", {
+            day: dayLabel,
+            mealType: selectedMealType,
+          })
+        )
+        return
+      }
       setLocalError(t("plan.addToPlanSaveFailed"))
     }
   }

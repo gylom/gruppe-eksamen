@@ -282,8 +282,7 @@ public class AppDbContext : DbContext
             .HasForeignKey(x => x.MaaltidstypeId);
 
         modelBuilder.Entity<PlanlagtMaaltid>()
-            .HasIndex(x => new { x.HusholdningId, x.UkeStartDato, x.Dag, x.MaaltidstypeId })
-            .IsUnique();
+            .HasIndex(x => new { x.HusholdningId, x.UkeStartDato, x.Dag, x.MaaltidstypeId });
 
         modelBuilder.Entity<PlanlagtMaaltidEkskludertIngrediens>().ToTable("PlanlagteMaaltidEkskludertIngrediens");
 

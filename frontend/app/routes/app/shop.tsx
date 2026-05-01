@@ -6,15 +6,22 @@ import { Link } from "react-router"
 import { Pencil, Plus } from "lucide-react"
 import { toast } from "sonner"
 
-import { SwipeActionRow } from "~/components/SwipeActionRow"
+import { Checkbox } from "~/components/ui/checkbox"
 import { DetailSheet } from "~/components/detail-sheet"
+import { RouteHeader } from "~/components/route-header"
 import { RouteErrorRetry } from "~/components/route-error-retry"
 import { Button, buttonVariants } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
 import { Label } from "~/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select"
 import { useCompleteShoppingTrip } from "~/features/shopping/use-complete-shopping-trip"
 import { useCreateShoppingItem } from "~/features/shopping/use-create-shopping-item"
-import { useShoppingCompletionPreview } from "~/features/shopping/use-shopping-completion-preview"
 import { useMaaleenheterLookup } from "~/features/shopping/use-maaleenheter-lookup"
 import { usePurchaseShoppingItem } from "~/features/shopping/use-purchase-shopping-item"
 import { usePurchasedShoppingList } from "~/features/shopping/use-purchased-shopping-list"
@@ -24,17 +31,12 @@ import { useUpdateShoppingItem } from "~/features/shopping/use-update-shopping-i
 import { useVaretyperLookup } from "~/features/shopping/use-varetyper-lookup"
 import type { ActiveShoppingListRow } from "~/features/shopping/types"
 import { ApiError } from "~/lib/api-fetch"
-import { getDateLocaleTag } from "~/lib/i18n"
 import { cn } from "~/lib/utils"
 
 const SHOP_ITEM_SHEET_TITLE_ID = "shop-item-sheet-title"
 const SHOP_COMPLETE_SHEET_TITLE_ID = "shop-complete-sheet-title"
 
-const selectStyles = cn(
-  "h-9 w-full min-w-0 rounded-4xl border border-input bg-input/30 px-3 py-1 text-base transition-colors outline-none",
-  "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
-  "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
-)
+const UNIT_NONE_VALUE = "__none__"
 
 function sourceKindLabel(kilde: string, t: TFunction): string {
   if (kilde === "plannedMeal") return t("shop.fromPlan")
@@ -53,27 +55,16 @@ function itemDisplayName(row: ActiveShoppingListRow): string {
   return row.varetype
 }
 
-function formatPurchasedAt(iso: string | null, localeTag: string): string {
-  if (!iso) return ""
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ""
-  return d.toLocaleString(localeTag, { dateStyle: "short", timeStyle: "short" })
-}
-
-type ShopListView = "active" | "purchased"
 type ShopFormError = {
   field: "type" | "unit" | "quantity"
   message: string
 }
 
 export default function ShopRoute() {
-  const { t, i18n } = useTranslation()
-  const dateLoc = getDateLocaleTag(i18n.language)
-  const [listView, setListView] = useState<ShopListView>("active")
+  const { t } = useTranslation()
   const listQuery = useShoppingList()
   const purchasedQuery = usePurchasedShoppingList(true)
   const [completeSheetOpen, setCompleteSheetOpen] = useState(false)
-  const previewQuery = useShoppingCompletionPreview(completeSheetOpen)
   const completeTrip = useCompleteShoppingTrip()
   const varetyperQuery = useVaretyperLookup()
   const maaleenheterQuery = useMaaleenheterLookup()
@@ -276,111 +267,61 @@ export default function ShopRoute() {
       ? t("shop.sheetEditPlanHint")
       : undefined
 
-  const list = listQuery.data?.varer ?? []
-  const listEmpty = listQuery.isSuccess && list.length === 0
-  const listLoading = listQuery.isLoading
-
+  const activeList = listQuery.data?.varer ?? []
   const purchasedList = purchasedQuery.data?.varer ?? []
   const purchasedCount = purchasedList.length
-  const purchasedEmpty = purchasedQuery.isSuccess && purchasedCount === 0
-  const showCompleteTrip =
-    purchasedQuery.isSuccess && (purchasedCount > 0 || listView === "purchased")
-  const purchasedLoading = listView === "purchased" && purchasedQuery.isLoading
+  const combinedList: Array<{
+    row: ActiveShoppingListRow
+    purchased: boolean
+  }> = [
+    ...activeList.map((row) => ({ row, purchased: false })),
+    ...purchasedList.map((row) => ({ row, purchased: true })),
+  ]
+  const totalCount = combinedList.length
+  const listEmpty =
+    listQuery.isSuccess && purchasedQuery.isSuccess && totalCount === 0
+  const listLoading = listQuery.isLoading || purchasedQuery.isLoading
+  const listError = listQuery.isError || purchasedQuery.isError
+  const listFetching = listQuery.isFetching || purchasedQuery.isFetching
+  const showCompleteTrip = purchasedQuery.isSuccess && purchasedCount > 0
+
+  function retryLists() {
+    if (listQuery.isError) void listQuery.refetch()
+    if (purchasedQuery.isError) void purchasedQuery.refetch()
+  }
 
   return (
-    <div className="flex min-h-0 flex-col">
-      <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight">
-              {t("shop.title")}
-            </h1>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {listView === "active"
-                ? t("shop.subtitleActive")
-                : t("shop.subtitlePurchased")}
-            </p>
-          </div>
-          {listView === "active" ? (
-            <Button
-              ref={addButtonRef}
-              type="button"
-              size="sm"
-              className="shrink-0 gap-1"
-              onClick={() => openAdd(addButtonRef.current ?? undefined)}
-            >
-              <Plus className="size-4" aria-hidden />
-              {t("shop.addShort")}
-            </Button>
-          ) : (
-            <span className="shrink-0" aria-hidden />
-          )}
-        </div>
-        <div
-          role="tablist"
-          aria-label={t("shop.viewToggle")}
-          className="mt-3 flex gap-1 rounded-xl border border-border bg-muted/30 p-1"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={listView === "active"}
-            className={cn(
-              "min-h-9 min-w-0 flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-              "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-              listView === "active"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setListView("active")}
-          >
-            {t("shop.tabActive")}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={listView === "purchased"}
-            className={cn(
-              "min-h-9 min-w-0 flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-              "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-              listView === "purchased"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setListView("purchased")}
-          >
-            {t("shop.tabPurchased")}
-          </button>
-        </div>
-        {showCompleteTrip ? (
-          <div className="mt-3">
+    <section className="px-4 pb-4" aria-label={t("shop.title")}>
+      <RouteHeader
+        title={t("shop.title")}
+        action={
+          showCompleteTrip ? (
             <Button
               ref={completeTripReturnFocusRef}
               type="button"
-              variant="secondary"
               size="sm"
-              className="min-h-10 w-full rounded-2xl font-medium"
-              disabled={purchasedCount === 0}
+              className="shrink-0"
               onClick={() => setCompleteSheetOpen(true)}
             >
               {t("shop.completeTripCta")}
             </Button>
-          </div>
-        ) : null}
-      </header>
+          ) : undefined
+        }
+        actionSpacerClassName="h-9"
+      />
 
-      <div className="flex-1 px-4 pt-4 pb-6">
-        {listView === "active" && listQuery.isError ? (
+      <div className="mx-auto mt-6 max-w-2xl">
+        {listError ? (
           <RouteErrorRetry
             title={t("shop.loadError")}
             hint={t("shop.loadErrorHint")}
             retryLabel={t("common.retry")}
-            busy={listQuery.isFetching}
-            onRetry={() => void listQuery.refetch()}
+            busy={listFetching}
+            onRetry={retryLists}
           />
         ) : null}
 
-        {listView === "active" && listLoading && !listQuery.isError ? (
+        {listLoading && !listError ? (
           <ul
             className="space-y-2"
             aria-busy="true"
@@ -395,7 +336,7 @@ export default function ShopRoute() {
           </ul>
         ) : null}
 
-        {listView === "active" && listQuery.isSuccess && listEmpty ? (
+        {!listError && !listLoading && listEmpty ? (
           <section
             className="flex min-h-[280px] flex-col items-center justify-center gap-5 rounded-2xl border border-dashed border-border/80 bg-muted/20 px-4 py-10 text-center"
             aria-label={t("shop.emptyAria")}
@@ -411,17 +352,19 @@ export default function ShopRoute() {
             <div className="flex w-full max-w-sm flex-col gap-2 sm:flex-row sm:justify-center">
               <Button
                 type="button"
-                className="w-full sm:w-auto"
+                size="lg"
+                className="min-h-11 w-full justify-center rounded-[21px] sm:w-auto"
                 onClick={() => openAdd()}
               >
                 {t("shop.addItem")}
               </Button>
               <Link
-                to="/app/plan"
+                to="/app/meals"
                 className={buttonVariants({
                   variant: "outline",
+                  size: "lg",
                   className:
-                    "inline-flex min-h-11 w-full justify-center rounded-2xl sm:w-auto",
+                    "min-h-11 w-full justify-center rounded-2xl sm:w-auto",
                 })}
               >
                 {t("shop.emptyGotoPlan")}
@@ -430,147 +373,97 @@ export default function ShopRoute() {
           </section>
         ) : null}
 
-        {listView === "active" && listQuery.isSuccess && !listEmpty ? (
+        {!listError && !listLoading && !listEmpty ? (
           <ul className="space-y-2">
-            {list.map((row) => {
+            {combinedList.map(({ row, purchased }) => {
               const name = itemDisplayName(row)
-              const rowPurchasePending = pendingPurchaseIds.has(row.id)
+              const inputId = `shop-row-${row.id}`
+              const pending = purchased
+                ? pendingRestoreIds.has(row.id)
+                : pendingPurchaseIds.has(row.id)
               return (
                 <li
-                  key={row.id}
-                  className="overflow-hidden rounded-xl border border-border/80 bg-card/50 shadow-sm"
+                  key={`${purchased ? "p" : "a"}-${row.id}`}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl border border-border/80 bg-card/50 p-3 shadow-sm transition-colors",
+                    purchased && "opacity-70"
+                  )}
                 >
-                  <SwipeActionRow
-                    actionLabel={t("shop.markPurchased")}
-                    fallbackAriaLabel={t("shop.purchaseAria", { name })}
-                    loading={rowPurchasePending}
-                    disabled={rowPurchasePending}
-                    onAction={() => purchaseRow(row.id)}
+                  <label
+                    htmlFor={inputId}
+                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"
                   >
-                    <div className="flex min-w-0 gap-2 pr-1">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                          <span className="shrink-0 text-sm font-semibold text-foreground tabular-nums">
-                            {formatQuantityLine(row, t)}
-                          </span>
-                          <span className="min-w-0 text-sm leading-snug font-medium break-words">
-                            {name}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          <span className="font-medium text-foreground/80">
-                            {sourceKindLabel(row.kilde, t)}
-                          </span>
-                          <span aria-hidden> · </span>
-                          <span>{row.brukernavn}</span>
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="shrink-0 text-muted-foreground hover:text-foreground"
-                        aria-label={t("shop.editRow", { name })}
-                        disabled={rowPurchasePending}
-                        onClick={(e) => openEdit(row, e.currentTarget)}
-                      >
-                        <Pencil className="size-4" aria-hidden />
-                      </Button>
-                    </div>
-                  </SwipeActionRow>
-                </li>
-              )
-            })}
-          </ul>
-        ) : null}
-
-        {listView === "purchased" && purchasedQuery.isError ? (
-          <RouteErrorRetry
-            title={t("shop.purchasedLoadError")}
-            hint={t("shop.loadErrorHint")}
-            retryLabel={t("common.retry")}
-            busy={purchasedQuery.isFetching}
-            onRetry={() => void purchasedQuery.refetch()}
-          />
-        ) : null}
-
-        {listView === "purchased" &&
-        purchasedLoading &&
-        !purchasedQuery.isError ? (
-          <ul
-            className="space-y-2"
-            aria-busy="true"
-            aria-label={t("shop.loadingPurchased")}
-          >
-            {Array.from({ length: 5 }).map((_, i) => (
-              <li
-                key={i}
-                className="h-[4.25rem] animate-pulse rounded-xl bg-muted/60"
-              />
-            ))}
-          </ul>
-        ) : null}
-
-        {listView === "purchased" &&
-        purchasedQuery.isSuccess &&
-        purchasedEmpty ? (
-          <section
-            className="flex min-h-[280px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/80 bg-muted/20 px-4 py-10 text-center"
-            aria-label={t("shop.purchasedEmptyAria")}
-          >
-            <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
-              {t("shop.purchasedExplainer")}
-            </p>
-          </section>
-        ) : null}
-
-        {listView === "purchased" &&
-        purchasedQuery.isSuccess &&
-        !purchasedEmpty ? (
-          <ul className="space-y-2">
-            {purchasedList.map((row) => {
-              const name = itemDisplayName(row)
-              const rowRestorePending = pendingRestoreIds.has(row.id)
-              const boughtLine = formatPurchasedAt(row.purchasedAt, dateLoc)
-              return (
-                <li
-                  key={row.id}
-                  className="overflow-hidden rounded-xl border border-border/80 bg-card/50 shadow-sm"
-                >
-                  <SwipeActionRow
-                    actionLabel={t("shop.restore")}
-                    fallbackAriaLabel={t("shop.restoreAria", { name })}
-                    loading={rowRestorePending}
-                    disabled={rowRestorePending}
-                    onAction={() => restoreRow(row.id)}
-                  >
-                    <div className="min-w-0 pr-1">
+                    <Checkbox
+                      id={inputId}
+                      className="shrink-0"
+                      checked={purchased}
+                      disabled={pending}
+                      onCheckedChange={(next) => {
+                        if (next === true && !purchased) purchaseRow(row.id)
+                        else if (next === false && purchased) restoreRow(row.id)
+                      }}
+                      aria-label={
+                        purchased
+                          ? t("shop.restoreAria", { name })
+                          : t("shop.purchaseAria", { name })
+                      }
+                    />
+                    <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                        <span className="shrink-0 text-sm font-semibold text-foreground tabular-nums">
+                        <span
+                          className={cn(
+                            "shrink-0 text-sm font-semibold text-foreground tabular-nums",
+                            purchased && "text-muted-foreground line-through"
+                          )}
+                        >
                           {formatQuantityLine(row, t)}
                         </span>
-                        <span className="min-w-0 text-sm leading-snug font-medium break-words">
+                        <span
+                          className={cn(
+                            "min-w-0 text-sm leading-snug font-medium break-words",
+                            purchased && "text-muted-foreground line-through"
+                          )}
+                        >
                           {name}
                         </span>
                       </div>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground/80">
-                          {sourceKindLabel(row.kilde, t)}
-                        </span>
-                        <span aria-hidden> · </span>
-                        <span>{row.brukernavn}</span>
-                      </p>
-                      <p className="mt-1 text-xs font-medium text-foreground">
-                        <span className="rounded-md border border-border bg-muted/50 px-1.5 py-0.5">
-                          {t("shop.purchasedBadge")}
-                          {boughtLine ? ` · ${boughtLine}` : ""}
-                        </span>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {sourceKindLabel(row.kilde, t)}
                       </p>
                     </div>
-                  </SwipeActionRow>
+                  </label>
+                  {!purchased ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="shrink-0 text-muted-foreground hover:text-foreground"
+                      aria-label={t("shop.editRow", { name })}
+                      disabled={pending}
+                      onClick={(e) => openEdit(row, e.currentTarget)}
+                    >
+                      <Pencil className="size-4" aria-hidden />
+                    </Button>
+                  ) : null}
                 </li>
               )
             })}
+            <li>
+              <button
+                ref={addButtonRef}
+                type="button"
+                className="flex w-full cursor-pointer items-center gap-3 rounded-xl border border-dashed border-border/80 bg-muted/20 p-3 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+                onClick={() => openAdd(addButtonRef.current ?? undefined)}
+              >
+                <span
+                  className="flex size-4 shrink-0 items-center justify-center rounded-[6px] border border-input"
+                  aria-hidden
+                >
+                  <Plus className="size-3.5" />
+                </span>
+                <span>{t("shop.addItem")}</span>
+              </button>
+            </li>
           </ul>
         ) : null}
       </div>
@@ -646,38 +539,80 @@ export default function ShopRoute() {
             ) : null}
             <div className="space-y-2">
               <Label htmlFor="shop-varetype">{t("shop.typeLabel")}</Label>
-              <select
-                id="shop-varetype"
-                className={selectStyles}
+              <Select
                 value={varetypeIdStr}
-                aria-invalid={formError?.field === "type" ? true : undefined}
-                onChange={(e) => setVaretypeIdStr(e.target.value)}
+                onValueChange={(v) => setVaretypeIdStr(v ?? "")}
               >
-                <option value="">{t("shop.selectTypePlaceholder")}</option>
-                {(varetyperQuery.data ?? []).map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.varetype}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger
+                  id="shop-varetype"
+                  className="w-full rounded-4xl"
+                  aria-invalid={formError?.field === "type" ? true : undefined}
+                >
+                  <SelectValue placeholder={t("shop.selectTypePlaceholder")}>
+                    {(value) => {
+                      if (value == null || value === "") {
+                        return t("shop.selectTypePlaceholder")
+                      }
+                      const id = Number(value)
+                      const v = (varetyperQuery.data ?? []).find(
+                        (v) => v.id === id
+                      )
+                      return v?.varetype ?? t("shop.selectTypePlaceholder")
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {(varetyperQuery.data ?? []).map((v) => (
+                    <SelectItem key={v.id} value={String(v.id)}>
+                      {v.varetype}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="shop-maaleenhet">{t("shop.unitLabel")}</Label>
-              <select
-                id="shop-maaleenhet"
-                className={selectStyles}
-                value={maaleenhetIdStr}
-                aria-invalid={formError?.field === "unit" ? true : undefined}
-                onChange={(e) => setMaaleenhetIdStr(e.target.value)}
+              <Select
+                value={
+                  maaleenhetIdStr === "" ? UNIT_NONE_VALUE : maaleenhetIdStr
+                }
+                onValueChange={(v) =>
+                  setMaaleenhetIdStr(
+                    v == null || v === UNIT_NONE_VALUE ? "" : v
+                  )
+                }
               >
-                <option value="">{t("shop.unitNone")}</option>
-                {(maaleenheterQuery.data ?? []).map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.enhet}
-                    {m.type ? ` (${m.type})` : ""}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger
+                  id="shop-maaleenhet"
+                  className="w-full rounded-4xl"
+                  aria-invalid={formError?.field === "unit" ? true : undefined}
+                >
+                  <SelectValue placeholder={t("shop.unitNone")}>
+                    {(value) => {
+                      if (value == null || value === UNIT_NONE_VALUE) {
+                        return t("shop.unitNone")
+                      }
+                      const id = Number(value)
+                      const m = (maaleenheterQuery.data ?? []).find(
+                        (m) => m.id === id
+                      )
+                      if (!m) return t("shop.unitNone")
+                      return `${m.enhet}${m.type ? ` (${m.type})` : ""}`
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNIT_NONE_VALUE}>
+                    {t("shop.unitNone")}
+                  </SelectItem>
+                  {(maaleenheterQuery.data ?? []).map((m) => (
+                    <SelectItem key={m.id} value={String(m.id)}>
+                      {m.enhet}
+                      {m.type ? ` (${m.type})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="shop-kvantitet">{t("shop.qtyLabel")}</Label>
@@ -718,14 +653,7 @@ export default function ShopRoute() {
             <Button
               type="button"
               className="min-h-11 flex-1 rounded-2xl"
-              disabled={
-                completeTrip.isPending ||
-                previewQuery.isLoading ||
-                previewQuery.isFetching ||
-                previewQuery.isError ||
-                !previewQuery.data ||
-                previewQuery.data.archiveRowCount < 1
-              }
+              disabled={completeTrip.isPending}
               onClick={() =>
                 completeTrip.mutate(undefined, {
                   onSuccess: (data) => {
@@ -752,65 +680,8 @@ export default function ShopRoute() {
           </div>
         }
       >
-        {previewQuery.isLoading ? (
-          <div className="space-y-3" aria-busy="true">
-            <div className="h-10 animate-pulse rounded-xl bg-muted/80" />
-            <div className="h-10 animate-pulse rounded-xl bg-muted/80" />
-            <div className="h-10 animate-pulse rounded-xl bg-muted/80" />
-          </div>
-        ) : previewQuery.isError ? (
-          <div className="space-y-3" role="alert">
-            <p className="text-sm text-destructive">
-              {t("shop.previewFailed")}
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="rounded-2xl"
-              onClick={() => void previewQuery.refetch()}
-            >
-              {t("common.retry")}
-            </Button>
-          </div>
-        ) : previewQuery.data ? (
-          <ul className="list-none space-y-3 text-sm leading-snug text-foreground">
-            <li className="rounded-xl border border-border/80 bg-muted/20 px-3 py-2.5">
-              <span className="font-medium text-foreground">
-                {t("shop.previewArchiveLabel")}
-              </span>
-              <span className="mt-0.5 block text-muted-foreground tabular-nums">
-                {previewQuery.data.archiveRowCount}{" "}
-                {previewQuery.data.archiveRowCount === 1
-                  ? t("shop.rowSingular")
-                  : t("shop.rowPlural")}
-              </span>
-            </li>
-            <li className="rounded-xl border border-border/80 bg-muted/20 px-3 py-2.5">
-              <span className="font-medium text-foreground">
-                {t("shop.previewCookbookLabel")}
-              </span>
-              <span className="mt-0.5 block text-muted-foreground tabular-nums">
-                {previewQuery.data.cookbookMealCount}{" "}
-                {previewQuery.data.cookbookMealCount === 1
-                  ? t("shop.mealSingular")
-                  : t("shop.mealPlural")}
-              </span>
-            </li>
-            <li className="rounded-xl border border-border/80 bg-muted/20 px-3 py-2.5">
-              <span className="font-medium text-foreground">
-                {t("shop.previewActiveLabel")}
-              </span>
-              <span className="mt-0.5 block text-muted-foreground tabular-nums">
-                {previewQuery.data.remainingActiveRowCount}{" "}
-                {previewQuery.data.remainingActiveRowCount === 1
-                  ? t("shop.rowSingular")
-                  : t("shop.rowPlural")}
-              </span>
-            </li>
-          </ul>
-        ) : null}
+        <></>
       </DetailSheet>
-    </div>
+    </section>
   )
 }

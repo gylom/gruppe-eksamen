@@ -35,7 +35,10 @@
       "Bash(git fetch *)",
       "Bash(git merge *)",
       "Bash(git branch *)",
-      "WebFetch(domain:uselayouts.com)"
+      "WebFetch(domain:uselayouts.com)",
+      "Bash(pnpm tsc *)",
+      "Bash(python -c \"import json,sys; print\\(json.dumps\\(json.load\\(sys.stdin\\)['scripts'], indent=2\\)\\)\")",
+      "Bash(echo \"exit=$?\")"
     ],
     "additionalDirectories": [
       "\\tmp"

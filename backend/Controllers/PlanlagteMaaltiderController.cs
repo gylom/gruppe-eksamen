@@ -33,7 +33,10 @@ public class PlanlagteMaaltiderController : ControllerBase
 
         var rows = await _db.PlanlagteMaaltider
             .AsNoTracking()
-            .Where(x => x.HusholdningId == householdId.Value && x.UkeStartDato == monday)
+            .Where(x =>
+                x.HusholdningId == householdId.Value &&
+                x.UkeStartDato == monday &&
+                x.RemovedFromPlanAt == null)
             .Include(x => x.Oppskrift!)
                 .ThenInclude(o => o.Ingredienser)
                 .ThenInclude(i => i.Varetype)
@@ -102,7 +105,8 @@ public class PlanlagteMaaltiderController : ControllerBase
             x.HusholdningId == householdId.Value &&
             x.UkeStartDato == monday &&
             x.Dag == request.Day &&
-            x.MaaltidstypeId == request.MealTypeId);
+            x.MaaltidstypeId == request.MealTypeId &&
+            x.RemovedFromPlanAt == null);
 
         if (slotTaken)
             return Conflict(new { message = "Denne måltidsplassen er allerede i bruk." });
@@ -132,7 +136,8 @@ public class PlanlagteMaaltiderController : ControllerBase
                 x.HusholdningId == householdId.Value &&
                 x.UkeStartDato == monday &&
                 x.Dag == request.Day &&
-                x.MaaltidstypeId == request.MealTypeId);
+                x.MaaltidstypeId == request.MealTypeId &&
+                x.RemovedFromPlanAt == null);
 
             if (slotNowTaken)
                 return Conflict(new { message = "Denne måltidsplassen er allerede i bruk." });
@@ -314,21 +319,26 @@ public class PlanlagteMaaltiderController : ControllerBase
             h.PurchasedAt != null &&
             (h.PlanlagtMaaltidId == meal.Id || linkedHandlelisteIds.Contains(h.Id)));
 
-        if (purchased)
-            return Conflict(new
-            {
-                message =
-                    "Dette måltidet kan ikke fjernes fordi handlelisten viser at det allerede er handlet. Kokkeloggen må beholdes."
-            });
-
         await using var tx = await _db.Database.BeginTransactionAsync();
         try
         {
             var linked = await _db.Handleliste
                 .Where(h => h.PlanlagtMaaltidId == meal.Id || linkedHandlelisteIds.Contains(h.Id))
                 .ToListAsync();
-            _db.Handleliste.RemoveRange(linked);
-            _db.PlanlagteMaaltider.Remove(meal);
+            _db.Handleliste.RemoveRange(linked.Where(h =>
+                h.PurchasedAt == null &&
+                h.ArchivedAt == null &&
+                h.Kilde == "plannedMeal"));
+
+            if (purchased)
+            {
+                meal.RemovedFromPlanAt = DateTime.UtcNow;
+                meal.UpdatedAt = meal.RemovedFromPlanAt.Value;
+            }
+            else
+            {
+                _db.PlanlagteMaaltider.Remove(meal);
+            }
             await _db.SaveChangesAsync();
             await tx.CommitAsync();
         }

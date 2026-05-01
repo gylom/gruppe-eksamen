@@ -36,10 +36,10 @@ const resources = {
   nb: {
     translation: {
       nav: {
-        chef: "Kjøkken",
-        plan: "Plan",
-        shop: "Handel",
-        book: "Bok",
+        chef: "Oppskrifter",
+        plan: "Ukeplan",
+        shop: "Handleliste",
+        book: "Kokebok",
         account: "Konto",
         main: "Hovednavigasjon",
       },
@@ -171,7 +171,7 @@ const resources = {
       },
       chef: {
         title: "Kjøkken",
-        subtitle: "Finn oppskrifter og åpne detaljer her.",
+        heading: "Hva skal vi lage?",
         searchLabel: "Søk",
         searchInRecipes: "Søk i oppskrifter",
         searchPlaceholder: "Søk på navn eller ingrediens",
@@ -191,9 +191,13 @@ const resources = {
         filterChipType: "Måltidstype",
         filterSelectedSuffix: ", valgt",
       },
+      recipeDetail: {
+        ingredientsTitle: "Ingredienser",
+        ariaExclude: "Ta {{item}} ut — vi har det allerede",
+        ariaInclude: "Ta {{item}} med i planen",
+      },
       book: {
         title: "Kokebok",
-        subtitle: "Måltider husstanden har laget etter fullførte handleturer.",
         searchLabel: "Søk",
         searchPlaceholder: "Oppskrift eller måltidstype",
         filterMealType: "Filtrer etter måltidstype",
@@ -231,7 +235,6 @@ const resources = {
       },
       shop: {
         title: "Handleliste",
-        subtitleActive: "Aktive varer i husholdningen",
         subtitlePurchased: "Varer du har krysset av — gjenopprett ved feil",
         viewToggle: "Handlelistevisning",
         tabActive: "Aktiv",
@@ -297,7 +300,7 @@ const resources = {
         mealSingular: "måltid",
         mealPlural: "måltider",
         completeDescription:
-          "Bekreft når du er ferdig i butikken. Kjøpte rader arkiveres for kokebok senere; aktive rader blir stående.",
+          "Måltidene dere har handlet inn til lagres i kokeboken. Aktive varer blir stående på lista.",
         sheetEditPlanHint:
           "Rader fra ukesplanen beholder kobling til måltidene når du lagrer.",
         toastCompleteError: "Kunne ikke fullføre handleturen. Prøv igjen.",
@@ -309,6 +312,7 @@ const resources = {
         mondayLine: "Mandag {{date}}",
         prevWeek: "Forrige uke",
         nextWeek: "Neste uke",
+        weekPickerAria: "Velg uke",
         loadError: "Kunne ikke laste ukeplan.",
         loadErrorHint: "Sjekk nettverket og prøv på nytt.",
         loading: "Laster ukeplan",
@@ -321,7 +325,11 @@ const resources = {
           "Legg til oppskrifter under Kjøkken, så får dere planen på plass. Under ser du ukedagene slik at dere vet hva som mangler.",
         emptyWeekCta: "Åpne Kjøkken",
         slotEmptyLine: "Tom — åpne kjøkken",
-        generateSuggestions: "Generer handleforslag",
+        slotEmptyShort: "Legg til",
+        today: "I dag",
+        showPastDays: "Vis tidligere dager",
+        hidePastDays: "Skjul tidligere dager",
+        generateSuggestions: "Legg til handleliste",
         generating: "Genererer…",
         weekRangeHint: "Trykk ukepiler for å bytte uke.",
         servings: "{{n}} porsjoner",
@@ -334,6 +342,8 @@ const resources = {
         generateHint:
           "Les fra denne ukens plan (lagrer ikke i handleliste ennå).",
         addSlotAria: "Legg til {{meal}} på {{day}}",
+        pastDaySlotAria:
+          "Kan ikke legge til {{meal}} på {{day}} (dagen er passert)",
         ingredientsTitle: "Ingredienser",
         swipeOrButtonHint: "Stryk eller bruk knappen",
         ingredientsExplainer:
@@ -353,9 +363,9 @@ const resources = {
         removeConfirmLead:
           "Er du sikker på at du vil fjerne {{recipe}} fra {{week}}? Dette påvirker alle i husholdningen.",
         removeConfirmHint:
-          "Hvis handlelisten viser at måltidet allerede er handlet, kan det ikke fjernes her — kokkeloggen må beholdes.",
+          "Måltidet fjernes fra ukeplanen. Aktive handlevarer fra måltidet fjernes, mens kjøpte varer og kokebokhistorikk beholdes.",
         removeProtectedReason:
-          "Dette måltidet er allerede knyttet til kjøpte handlevarer og kan ikke fjernes her.",
+          "Dette måltidet har kjøpt handlehistorikk, så kokebokhistorikken beholdes.",
         addToPlanWeekLabel: "Uke",
         addToPlanChooseWeek: "Velg uke",
         addToPlanThisWeek: "Denne uken",
@@ -363,6 +373,9 @@ const resources = {
         addToPlanDayLabel: "Dag",
         addToPlanMealTypeLabel: "Måltidstype",
         addToPlanChooseMealType: "Velg måltidstype",
+        addToPlanDayFallback: "valgt dag",
+        addToPlanSlotTaken:
+          "Du har allerede {{mealType}} planlagt på {{day}}. Velg en annen dag eller måltidstype.",
         addToPlanSaveFailed: "Kunne ikke lagre i planen. Prøv igjen.",
         toastServingsUpdated: "Porsjoner oppdatert.",
         toastIngredientRestored: "Ingrediens er med i planen igjen.",
@@ -418,10 +431,10 @@ const resources = {
   en: {
     translation: {
       nav: {
-        chef: "Kitchen",
-        plan: "Plan",
-        shop: "Shop",
-        book: "Book",
+        chef: "Recipes",
+        plan: "Meals",
+        shop: "Groceries",
+        book: "Cookbook",
         account: "Account",
         main: "Main navigation",
       },
@@ -553,7 +566,7 @@ const resources = {
       },
       chef: {
         title: "Kitchen",
-        subtitle: "Find recipes and open details here.",
+        heading: "What are we making?",
         searchLabel: "Search",
         searchInRecipes: "Search recipes",
         searchPlaceholder: "Search by name or ingredient",
@@ -573,10 +586,13 @@ const resources = {
         filterChipType: "Meal type",
         filterSelectedSuffix: ", selected",
       },
+      recipeDetail: {
+        ingredientsTitle: "Ingredients",
+        ariaExclude: "Take {{item}} out — we already have it",
+        ariaInclude: "Include {{item}} in the plan",
+      },
       book: {
         title: "Cookbook",
-        subtitle:
-          "Meals your household has made after completed shopping trips.",
         searchLabel: "Search",
         searchPlaceholder: "Recipe or meal type",
         filterMealType: "Filter by meal type",
@@ -613,8 +629,7 @@ const resources = {
         rateAria: "Rate {{recipe}} with {{step}} of 5",
       },
       shop: {
-        title: "Shopping list",
-        subtitleActive: "Active items for your household",
+        title: "Groceries list",
         subtitlePurchased: "Items you checked off — restore if needed",
         viewToggle: "List view",
         tabActive: "Active",
@@ -632,7 +647,7 @@ const resources = {
         fromPlan: "From plan",
         manual: "Manual",
         addShort: "Add",
-        completeTripCta: "Complete shopping trip",
+        completeTripCta: "Shopping completed",
         loadErrorHint: "Check your network and try again.",
         noAmount: "No amount",
         markedPurchased: "Marked as purchased",
@@ -642,7 +657,7 @@ const resources = {
         completeTitle: "Finish shopping trip?",
         confirm: "Confirm",
         completing: "Completing…",
-        tripCompleted: "Shopping trip completed",
+        tripCompleted: "Shopping completed",
         nothingToArchive: "Nothing new to archive",
         emptyActiveHint:
           "Add what you need, or pull suggestions from the weekly plan on Plan.",
@@ -680,7 +695,7 @@ const resources = {
         mealSingular: "meal",
         mealPlural: "meals",
         completeDescription:
-          "Confirm when you're done in the store. Purchased rows are archived for the cookbook later; active rows stay put.",
+          "The meals you shopped for are saved to the cookbook. Active items stay on the list.",
         sheetEditPlanHint:
           "Rows from the weekly plan keep their meal links when you save.",
         toastCompleteError: "Could not complete the shopping trip. Try again.",
@@ -692,6 +707,7 @@ const resources = {
         mondayLine: "Monday {{date}}",
         prevWeek: "Previous week",
         nextWeek: "Next week",
+        weekPickerAria: "Choose week",
         loadError: "Could not load weekly plan.",
         loadErrorHint: "Check your network and try again.",
         loading: "Loading weekly plan",
@@ -704,7 +720,11 @@ const resources = {
           "Add recipes in Kitchen to fill the plan. Your weekdays below show what is still open.",
         emptyWeekCta: "Open Kitchen",
         slotEmptyLine: "Empty — open kitchen",
-        generateSuggestions: "Generate shopping suggestions",
+        slotEmptyShort: "Add",
+        today: "Today",
+        showPastDays: "Show past days",
+        hidePastDays: "Hide past days",
+        generateSuggestions: "Add to groceries",
         generating: "Generating…",
         weekRangeHint: "Use the week arrows to change week.",
         servings: "{{n}} servings",
@@ -717,6 +737,7 @@ const resources = {
         generateHint:
           "Read from this week's plan (does not save to the shopping list yet).",
         addSlotAria: "Add {{meal}} on {{day}}",
+        pastDaySlotAria: "Cannot add {{meal}} on {{day}} (day has passed)",
         ingredientsTitle: "Ingredients",
         swipeOrButtonHint: "Swipe or use the button",
         ingredientsExplainer:
@@ -736,9 +757,9 @@ const resources = {
         removeConfirmLead:
           "Remove {{recipe}} from {{week}}? This affects everyone in the household.",
         removeConfirmHint:
-          "If shopping data shows this meal is already bought, it cannot be removed here — the cook history must stay intact.",
+          "The meal is removed from the week plan. Active shopping rows from the meal are removed, while purchased rows and cookbook history are kept.",
         removeProtectedReason:
-          "This meal is already linked to purchased shopping items and cannot be removed here.",
+          "This meal has purchased shopping history, so cookbook history is kept.",
         addToPlanWeekLabel: "Week",
         addToPlanChooseWeek: "Choose week",
         addToPlanThisWeek: "This week",
@@ -746,6 +767,9 @@ const resources = {
         addToPlanDayLabel: "Day",
         addToPlanMealTypeLabel: "Meal type",
         addToPlanChooseMealType: "Choose meal type",
+        addToPlanDayFallback: "the selected day",
+        addToPlanSlotTaken:
+          "You already have {{mealType}} planned on {{day}}. Choose another day or meal type.",
         addToPlanSaveFailed: "Could not save to the plan. Try again.",
         toastServingsUpdated: "Servings updated.",
         toastIngredientRestored: "Ingredient is back in the plan.",

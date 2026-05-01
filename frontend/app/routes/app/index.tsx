@@ -1,5 +1,5 @@
 import { Navigate } from "react-router"
 
 export default function AppIndexRoute() {
-  return <Navigate to="/app/chef" replace />
+  return <Navigate to="/app/recipes" replace />
 }

@@ -416,7 +416,10 @@ public class HandlelisteController : ControllerBase
     {
         var plannedMeals = await _db.PlanlagteMaaltider
             .AsNoTracking()
-            .Where(x => x.HusholdningId == householdId && x.UkeStartDato == monday)
+            .Where(x =>
+                x.HusholdningId == householdId &&
+                x.UkeStartDato == monday &&
+                x.RemovedFromPlanAt == null)
             .Include(x => x.Oppskrift!)
             .ThenInclude(o => o.Ingredienser)
             .ThenInclude(i => i.Varetype)

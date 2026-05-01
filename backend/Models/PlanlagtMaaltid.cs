@@ -33,6 +33,9 @@ public class PlanlagtMaaltid
     [Column("updated_at")]
     public DateTime UpdatedAt { get; set; }
 
+    [Column("removed_from_plan_at")]
+    public DateTime? RemovedFromPlanAt { get; set; }
+
     public Husholdning? Husholdning { get; set; }
     public Oppskrift? Oppskrift { get; set; }
     public Oppskriftskategori? Maaltidstype { get; set; }

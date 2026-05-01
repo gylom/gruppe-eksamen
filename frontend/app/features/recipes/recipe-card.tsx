@@ -23,12 +23,13 @@ export const RecipeCard = forwardRef<HTMLButtonElement, RecipeCardProps>(functio
       type="button"
       className={cn(
         "flex w-full gap-3 rounded-2xl border border-border bg-card p-3 text-left shadow-none ring-ring transition-[box-shadow,border-color] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/45",
+        "min-[400px]:flex-col min-[400px]:gap-0 min-[400px]:p-0 min-[400px]:overflow-hidden",
         className,
       )}
       aria-label={`Vis detaljer: ${label}`}
       {...props}
     >
-      <div className="relative size-20 shrink-0 overflow-hidden rounded-xl bg-muted">
+      <div className="relative size-20 shrink-0 overflow-hidden rounded-xl bg-muted min-[400px]:size-auto min-[400px]:h-36 min-[400px]:w-full min-[400px]:rounded-none">
         {showImg ? (
           <img
             src={recipe.bilde!}
@@ -42,7 +43,7 @@ export const RecipeCard = forwardRef<HTMLButtonElement, RecipeCardProps>(functio
           </div>
         )}
       </div>
-      <div className="min-w-0 flex-1 space-y-1">
+      <div className="min-w-0 flex-1 space-y-1 min-[400px]:p-3">
         <p className="font-heading line-clamp-2 text-sm font-semibold text-foreground">{recipe.navn}</p>
         <p className="text-xs text-muted-foreground">
           {recipe.kategori ?? "Uten kategori"}

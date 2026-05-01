@@ -15,4 +15,7 @@ public class CookbookHistoryItemDto
     public DateTime LastCookedAt { get; set; }
     public int? CurrentUserRating { get; set; }
     public int RecipePortions { get; set; }
+    public string? Bilde { get; set; }
+    public ulong? KategoriId { get; set; }
+    public string? Kategori { get; set; }
 }

@@ -230,8 +230,9 @@ CREATE TABLE PlanlagteMaaltider (
     porsjoner INT NOT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
+    removed_from_plan_at DATETIME NULL,
 
-    UNIQUE KEY uk_planlagte_slot (husholdning_id, uke_start_dato, dag, maaltidstype_id),
+    KEY idx_planlagte_slot (husholdning_id, uke_start_dato, dag, maaltidstype_id),
 
     FOREIGN KEY (husholdning_id) REFERENCES Husholdning(id),
     FOREIGN KEY (oppskrift_id) REFERENCES Oppskrifter(id) ON DELETE CASCADE,

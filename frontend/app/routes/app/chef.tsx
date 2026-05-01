@@ -1,13 +1,13 @@
-import { useMemo, useRef, useState } from "react"
-import { Search } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { useSearchParams } from "react-router"
 import { toast } from "sonner"
 
 import { DetailSheet } from "~/components/detail-sheet"
+import { RouteHeader } from "~/components/route-header"
 import { RouteErrorRetry } from "~/components/route-error-retry"
+import { SearchFilterPopover } from "~/components/search-filter-popover"
 import { Button } from "~/components/ui/button"
-import { Input } from "~/components/ui/input"
-import { Label } from "~/components/ui/label"
 import { useHousehold } from "~/features/household/use-household"
 import { AddToPlanPanel } from "~/features/planning/add-to-plan-panel"
 import {
@@ -36,40 +36,109 @@ export default function ChefRoute() {
   const searchInputId = "chef-recipe-search"
   const detailTitleId = "chef-recipe-detail-title"
 
+  const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState("")
   const debouncedSearch = useDebouncedValue(search, 300)
   const trimmed = debouncedSearch.trim()
-  const [kategoriId, setKategoriId] = useState<number | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [sheetTitle, setSheetTitle] = useState("")
   const [showPlanForm, setShowPlanForm] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false)
 
   const householdQuery = useHousehold()
   const createPlannedMealMutation = useCreatePlannedMeal()
 
-  const filters: RecipeListFilters = useMemo(
-    () => ({
-      search: trimmed.length > 0 ? trimmed : null,
-      kategoriId,
-    }),
-    [trimmed, kategoriId],
-  )
-
   const categoriesQuery = useRecipeCategories()
-  const recipesQuery = useRecipes(filters)
   const detailQuery = useRecipe(selectedId, sheetOpen && selectedId != null)
 
   const returnFocusRef = useRef<HTMLButtonElement | null>(null)
 
   const filterCategories = useMemo(() => {
     if (!categoriesQuery.data) return []
-    return categoriesQuery.data.filter((c) => !EXCLUDED_FILTER_CATEGORY_IDS.has(c.id))
+    return categoriesQuery.data.filter(
+      (c) => !EXCLUDED_FILTER_CATEGORY_IDS.has(c.id)
+    )
   }, [categoriesQuery.data])
+
+  const kategoriIdFromUrl = useMemo(() => {
+    const raw = searchParams.get("kategoriId")
+    if (raw == null || raw === "") return null
+    const n = Number(raw)
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) return null
+    return n
+  }, [searchParams])
+
+  const initialDayFromUrl = useMemo(() => {
+    const raw = searchParams.get("day")
+    if (raw == null || raw === "") return null
+    const n = Number(raw)
+    if (!Number.isInteger(n) || n < 1 || n > 7) return null
+    return n
+  }, [searchParams])
+
+  const initialWeekStartFromUrl = useMemo(() => {
+    const raw = searchParams.get("weekStart")
+    if (raw == null || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null
+    return raw
+  }, [searchParams])
+
+  const kategoriId = useMemo(() => {
+    if (kategoriIdFromUrl == null) return null
+    if (filterCategories.length === 0) return kategoriIdFromUrl
+    return filterCategories.some((c) => c.id === kategoriIdFromUrl)
+      ? kategoriIdFromUrl
+      : null
+  }, [kategoriIdFromUrl, filterCategories])
+
+  useEffect(() => {
+    if (categoriesQuery.isLoading) return
+    if (kategoriIdFromUrl == null) return
+    if (filterCategories.length === 0) return
+    if (kategoriId != null) return
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete("kategoriId")
+        return next
+      },
+      { replace: true }
+    )
+  }, [
+    categoriesQuery.isLoading,
+    filterCategories.length,
+    kategoriId,
+    kategoriIdFromUrl,
+    setSearchParams,
+  ])
+
+  function setKategoriId(next: number | null) {
+    setSearchParams(
+      (prev) => {
+        const nextParams = new URLSearchParams(prev)
+        if (next == null) nextParams.delete("kategoriId")
+        else nextParams.set("kategoriId", String(next))
+        return nextParams
+      },
+      { replace: true }
+    )
+  }
+
+  const filters: RecipeListFilters = useMemo(
+    () => ({
+      search: trimmed.length > 0 ? trimmed : null,
+      kategoriId,
+    }),
+    [trimmed, kategoriId]
+  )
+
+  const recipesQuery = useRecipes(filters)
 
   const planningCategoriesForChef = useMemo(() => {
     const raw = categoriesQuery.data ?? []
-    const filtered = sortPlanningCategories(raw.filter((c) => PLANNING_MEAL_TYPE_IDS.has(c.id)))
+    const filtered = sortPlanningCategories(
+      raw.filter((c) => PLANNING_MEAL_TYPE_IDS.has(c.id))
+    )
     if (filtered.length > 0) return filtered
     return PLANNING_MEAL_TYPE_ORDER.map((id) => ({
       id,
@@ -79,7 +148,9 @@ export default function ChefRoute() {
 
   const hasActiveFilters = trimmed.length > 0 || kategoriId != null
   const listEmpty =
-    recipesQuery.data != null && recipesQuery.data.length === 0 && !recipesQuery.isFetching
+    recipesQuery.data != null &&
+    recipesQuery.data.length === 0 &&
+    !recipesQuery.isFetching
 
   const detailTitle = detailQuery.data?.navn ?? sheetTitle
   const detailDescription =
@@ -104,78 +175,35 @@ export default function ChefRoute() {
   const householdMemberCount = householdQuery.data?.medlemmer.length ?? null
 
   return (
-    <section className="p-4" aria-labelledby="chef-heading">
-      <div className="space-y-1">
-        <h1 id="chef-heading" className="font-heading text-xl font-semibold tracking-tight">
-          {t("chef.title")}
-        </h1>
-        <p className="text-sm text-muted-foreground">{t("chef.subtitle")}</p>
-      </div>
-
-      <div className="mt-6 space-y-3">
-        <Label htmlFor={searchInputId} className="text-foreground">
-          {t("chef.searchInRecipes")}
-        </Label>
-        <div className="relative">
-          <Search
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
+    <section className="px-4 pb-4" aria-label={t("chef.title")}>
+      <RouteHeader
+        title={t("chef.heading")}
+        action={
+          <SearchFilterPopover
+            open={panelOpen}
+            onOpenChange={setPanelOpen}
+            hasActiveFilters={hasActiveFilters}
+            searchId={searchInputId}
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder={t("chef.searchPlaceholder")}
+            searchAriaLabel={t("chef.searchInRecipes")}
+            categories={filterCategories}
+            selectedCategoryId={kategoriId}
+            onSelectCategoryId={setKategoriId}
+            categoryGroupAriaLabel={t("chef.filterMealType")}
+            allLabel={t("chef.all")}
+            chipAriaTemplate={(args) => t("chef.filterChipAria", args)}
+            chipAriaType={t("chef.filterChipType")}
+            selectedChipSuffix={t("chef.filterSelectedSuffix")}
+            categoriesLoading={categoriesQuery.isLoading}
+            categoriesLoadingLabel={t("chef.loadingFilters")}
+            triggerAriaLabel={t("chef.searchInRecipes")}
           />
-          <Input
-            id={searchInputId}
-            type="search"
-            autoComplete="off"
-            placeholder={t("chef.searchPlaceholder")}
-            className="pl-10"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-      </div>
+        }
+      />
 
-      <div className="mt-5">
-        <div
-          className="flex flex-wrap gap-2"
-          role="group"
-          aria-label={t("chef.filterMealType")}
-        >
-          <Button
-            type="button"
-            size="sm"
-            variant={kategoriId == null ? "default" : "outline"}
-            aria-pressed={kategoriId == null}
-            onClick={() => setKategoriId(null)}
-          >
-            {t("chef.all")}
-          </Button>
-          {categoriesQuery.isLoading ? (
-            <span className="text-xs text-muted-foreground">{t("chef.loadingFilters")}</span>
-          ) : null}
-          {filterCategories.map((c) => {
-            const selected = kategoriId === c.id
-            const chipSuffix = selected ? t("chef.filterSelectedSuffix") : ""
-            return (
-              <Button
-                key={c.id}
-                type="button"
-                size="sm"
-                variant={selected ? "default" : "outline"}
-                aria-pressed={selected}
-                aria-label={t("chef.filterChipAria", {
-                  type: t("chef.filterChipType"),
-                  name: c.navn,
-                  selectedSuffix: chipSuffix,
-                })}
-                onClick={() => setKategoriId(selected ? null : c.id)}
-              >
-                {c.navn}
-              </Button>
-            )
-          })}
-        </div>
-      </div>
-
-      <div className="mt-6 space-y-3" aria-live="polite">
+      <div className="mx-auto mt-6 max-w-2xl space-y-3" aria-live="polite">
         {recipesQuery.isError ? (
           <RouteErrorRetry
             title={t("chef.loadError")}
@@ -187,11 +215,14 @@ export default function ChefRoute() {
         ) : null}
 
         {recipesQuery.isFetching && recipesQuery.data == null ? (
-          <ul className="space-y-3" aria-label={t("chef.loadingListLabel")}>
-            {[0, 1, 2].map((i) => (
+          <ul
+            className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2"
+            aria-label={t("chef.loadingListLabel")}
+          >
+            {[0, 1, 2, 3, 4, 5].map((i) => (
               <li
                 key={i}
-                className="h-[5.5rem] animate-pulse rounded-2xl border border-border bg-muted/80"
+                className="h-[5.5rem] animate-pulse rounded-2xl border border-border bg-muted/80 min-[400px]:h-[13rem]"
               />
             ))}
           </ul>
@@ -199,12 +230,21 @@ export default function ChefRoute() {
 
         {listEmpty ? (
           <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-6 text-center">
-            <p className="text-sm font-medium text-foreground">{t("chef.noHits")}</p>
+            <p className="text-sm font-medium text-foreground">
+              {t("chef.noHits")}
+            </p>
             <p className="mt-2 text-sm text-muted-foreground">
-              {hasActiveFilters ? t("chef.noHitsFiltered") : t("chef.noRecipesYet")}
+              {hasActiveFilters
+                ? t("chef.noHitsFiltered")
+                : t("chef.noRecipesYet")}
             </p>
             {hasActiveFilters ? (
-              <Button type="button" className="mt-4" variant="secondary" onClick={clearFilters}>
+              <Button
+                type="button"
+                className="mt-4"
+                variant="secondary"
+                onClick={clearFilters}
+              >
                 {t("chef.clearFilters")}
               </Button>
             ) : null}
@@ -212,7 +252,7 @@ export default function ChefRoute() {
         ) : null}
 
         {recipesQuery.data != null && recipesQuery.data.length > 0 ? (
-          <ul className="space-y-3">
+          <ul className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
             {recipesQuery.data.map((r) => (
               <li key={r.id}>
                 <RecipeCard
@@ -275,7 +315,11 @@ export default function ChefRoute() {
         }
       >
         {detailQuery.isLoading ? (
-          <div className="space-y-4 py-2" aria-busy="true" aria-label={t("chef.loadingDetailLabel")}>
+          <div
+            className="space-y-4 py-2"
+            aria-busy="true"
+            aria-label={t("chef.loadingDetailLabel")}
+          >
             <div className="h-40 animate-pulse rounded-2xl bg-muted" />
             <div className="h-4 w-3/5 animate-pulse rounded bg-muted" />
             <div className="h-4 w-full animate-pulse rounded bg-muted" />
@@ -283,9 +327,19 @@ export default function ChefRoute() {
           </div>
         ) : null}
         {detailQuery.isError ? (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4" role="alert">
-            <p className="text-sm font-medium text-foreground">{t("chef.detailLoadError")}</p>
-            <Button type="button" size="sm" className="mt-3" onClick={() => void detailQuery.refetch()}>
+          <div
+            className="rounded-xl border border-destructive/30 bg-destructive/5 p-4"
+            role="alert"
+          >
+            <p className="text-sm font-medium text-foreground">
+              {t("chef.detailLoadError")}
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              className="mt-3"
+              onClick={() => void detailQuery.refetch()}
+            >
               {t("common.retry")}
             </Button>
           </div>
@@ -298,6 +352,9 @@ export default function ChefRoute() {
             recipePortions={detailQuery.data.porsjoner}
             householdMemberCount={householdMemberCount}
             mealCategories={planningCategoriesForChef}
+            initialDay={initialDayFromUrl}
+            initialWeekStart={initialWeekStartFromUrl}
+            initialMealTypeId={kategoriIdFromUrl}
             createMutation={createPlannedMealMutation}
             onSaved={() => {
               toast.success(t("book.planSavedToast"))

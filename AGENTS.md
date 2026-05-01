@@ -16,6 +16,10 @@ Always use Context7 when I need library/API documentation, code generation, setu
 
 **Only use `feature/frontend-rebuild` for ongoing work.** Do not create new branches (story branches, sub-feature branches, etc.) unless I explicitly ask. If you find yourself on a different branch with uncommitted changes, stop and ask before committing — never commit to or create a new branch on your own initiative.
 
+## Language translations
+
+All user-facing strings must be added to **both** `nb` and `en` translation objects in `frontend/app/lib/i18n.ts`. Never add a key to one language without adding it to the other.
+
 ## No markdown files context polution
 
 Ignore everything in:

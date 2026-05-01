@@ -1,4 +1,9 @@
-import { useEffect, type ReactNode, type RefObject } from "react"
+import {
+  Children,
+  useEffect,
+  type ReactNode,
+  type RefObject,
+} from "react"
 
 import {
   Sheet,
@@ -16,7 +21,7 @@ export type DetailSheetProps = {
   labelledById: string
   title: string
   description?: string
-  children: ReactNode
+  children?: ReactNode
   footer?: ReactNode
   returnFocusRef?: RefObject<Element | null>
 }
@@ -48,17 +53,19 @@ export function DetailSheet({
           "flex max-h-[calc(100dvh-7rem-env(safe-area-inset-bottom,0px))] min-h-0 w-[calc(100vw-2rem)] max-w-[480px] flex-col gap-0 overflow-hidden rounded-2xl p-0",
         )}
       >
-        <SheetHeader className="shrink-0 border-b border-border pb-4 text-left">
+        <SheetHeader className="shrink-0 pb-4 text-left">
           <SheetTitle id={labelledById} className="pr-10">
             {title}
           </SheetTitle>
           {description ? <SheetDescription>{description}</SheetDescription> : null}
         </SheetHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4">
-          {children}
-        </div>
+        {Children.count(children) > 0 ? (
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4">
+            {children}
+          </div>
+        ) : null}
         {footer ? (
-          <SheetFooter className="shrink-0 border-t border-border bg-popover pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <SheetFooter className="shrink-0 bg-popover pb-[max(1rem,env(safe-area-inset-bottom))]">
             {footer}
           </SheetFooter>
         ) : null}

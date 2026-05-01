@@ -7,10 +7,10 @@ export default [
   route("onboarding", "routes/onboarding.tsx"),
   route("app", "routes/app/layout.tsx", [
     index("routes/app/index.tsx"),
-    route("chef", "routes/app/chef.tsx"),
-    route("plan", "routes/app/plan.tsx"),
-    route("shop", "routes/app/shop.tsx"),
-    route("book", "routes/app/book.tsx"),
+    route("recipes", "routes/app/chef.tsx"),
+    route("meals", "routes/app/plan.tsx"),
+    route("groceries", "routes/app/shop.tsx"),
+    route("cookbook", "routes/app/book.tsx"),
     route("account", "routes/app/account.tsx"),
   ]),
 ] satisfies RouteConfig

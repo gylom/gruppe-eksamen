@@ -9,6 +9,9 @@ export interface CookbookHistoryItem {
   lastCookedAt: string
   currentUserRating: number | null
   recipePortions: number
+  bilde: string | null
+  kategoriId: number | null
+  kategori: string | null
 }
 
 export interface CookbookHistoryResponse {
