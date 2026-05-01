@@ -41,6 +41,10 @@ export default function App() {
 
   const [productSearch, setProductSearch] = useState("");
   const [productTypeFilter, setProductTypeFilter] = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [mainCategoryFilter, setMainCategoryFilter] = useState("");
+  const [storeFilter, setStoreFilter] = useState("");
 
   const [newProductForm, setNewProductForm] = useState({
     varenavn: "",
@@ -579,6 +583,18 @@ export default function App() {
     }
     return copy.sort((a, b) => b.matchProsent - a.matchProsent || (b.karakter ?? 0) - (a.karakter ?? 0));
   }, [recommendedRecipes, recommendedSortMode]);
+
+  const brandOptions = [...new Set(products.map((p) => p.merke).filter(Boolean))].sort();
+
+  const categoryOptions = [...new Set(products.map((p) => p.kategori).filter(Boolean))].sort();
+
+  const mainCategoryOptions = [...new Set(products.map((p) => p.hovedkategori).filter(Boolean))].sort();
+
+  const storeOptions = [
+    ...new Set(
+      products.flatMap((p) => (p.butikker || []).map((b) => b.butikk)).filter(Boolean)
+    ),
+  ].sort();
 
   async function loadHousehold() {
     try {
@@ -1962,8 +1978,15 @@ export default function App() {
               </div>
             </div>
 
-            <div className="grid three">
-              <label>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "0.75rem",
+                alignItems: "end"
+              }}
+            >
+              <label style={{ width: "150px" }}>
                 Søk
                 <input
                   value={productSearch}
@@ -1971,7 +1994,20 @@ export default function App() {
                   placeholder="melk, pasta, ean..."
                 />
               </label>
-              <label>
+
+              <label style={{ width: "150px" }}>
+                Merke
+                <select value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)}>
+                  <option value="">Alle</option>
+                  {brandOptions.map((brand) => (
+                    <option key={brand} value={brand}>
+                      {brand}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label style={{ width: "150px" }}>
                 Varetype
                 <select
                   value={productTypeFilter}
@@ -1985,7 +2021,47 @@ export default function App() {
                   ))}
                 </select>
               </label>
-              <div className="actions align-end">
+
+
+
+              <label style={{ width: "150px" }}>
+                Kategori
+                <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                  <option value="">Alle</option>
+                  {categoryOptions.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label style={{ width: "150px" }}>
+                Hovedkategori
+                <select value={mainCategoryFilter} onChange={(e) => setMainCategoryFilter(e.target.value)}>
+                  <option value="">Alle</option>
+                  {mainCategoryOptions.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label style={{ width: "150px" }}>
+                Butikk
+                <select value={storeFilter} onChange={(e) => setStoreFilter(e.target.value)}>
+                  <option value="">Alle</option>
+                  {storeOptions.map((store) => (
+                    <option key={store} value={store}>
+                      {store}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {/* <div className="actions align-end"> */}
+              <div className="actions" style={{ alignSelf: "end" }}>
                 <button onClick={loadProducts}>Oppdater varer</button>
               </div>
             </div>
@@ -1999,49 +2075,71 @@ export default function App() {
                     <th>Merke</th>
                     <th>Varetype</th>
                     <th>Kategori</th>
+                    <th>Hovedkategori</th>
                     <th>Pakning</th>
                     <th>EAN</th>
-                    <th>Butikker</th>
-                    <th>Priser</th>
+                    <th>Butikker  /  priser</th>
                     <th>Synlighet</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((product) => (
-                    <tr key={product.id}>
-                      <td>{product.id}</td>
-                      <td>{product.varenavn}</td>
-                      <td>{product.merke || "-"}</td>
-                      <td>{product.varetype}</td>
-                      <td>{product.kategori || "-"}</td>
-                      <td>
-                        {product.kvantitet
-                          ? `${product.kvantitet} ${product.maaleenhet || ""}`
-                          : "-"}
-                      </td>
-                      <td>{product.ean || "-"}</td>
-                      <td>
-                        {product.butikker?.length ? (
-                          product.butikker.map((b, index) => (
-                            <div key={index}>{b.butikk}</div>
-                          ))
-                        ) : (
-                          "-"
-                        )}
-                      </td>
+                  {products
+                    .filter((product) => {
+                      if (brandFilter && product.merke !== brandFilter) return false;
+                      if (categoryFilter && product.kategori !== categoryFilter) return false;
+                      if (mainCategoryFilter && product.hovedkategori !== mainCategoryFilter) return false;
+                      if (
+                        storeFilter &&
+                        !(product.butikker || []).some((b) => b.butikk === storeFilter)
+                      )
+                        return false;
 
-                      <td>
-                        {product.butikker?.length ? (
-                          product.butikker.map((b, index) => (
-                            <div key={index} style={{ textAlign: "right" }}>kr {Number(b.pris).toFixed(2)}</div>
-                          ))
-                        ) : (
-                          "-"
-                        )}
-                      </td>
-                      <td>{product.brukerdefinert ? "Husholdning" : "System"}</td>
-                    </tr>
-                  ))}
+                      return true;
+                    })
+                    .map((product) => (
+                      <tr key={product.id}>
+                        <td>{product.id}</td>
+                        <td>{product.varenavn}</td>
+                        <td>{product.merke || "-"}</td>
+                        <td>{product.varetype}</td>
+                        <td>{product.kategori || "-"}</td>
+                        <td>{product.hovedkategori}</td>
+                        <td>
+                          {product.kvantitet
+                            ? `${product.kvantitet} ${product.maaleenhet || ""}`
+                            : "-"}
+                        </td>
+                        <td>{product.ean || "-"}</td>
+                        <td>
+                          {(storeFilter
+                            ? (product.butikker || []).filter((b) => b.butikk === storeFilter)
+                            : product.butikker || []
+                          ).length ? (
+                            (storeFilter
+                              ? (product.butikker || []).filter((b) => b.butikk === storeFilter)
+                              : product.butikker || []
+                            ).map((b, index) => (
+                              <div
+                                key={index}
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  gap: "1rem"
+                                }}
+                              >
+                                <span>{b.butikk}</span>
+                                <span style={{ whiteSpace: "nowrap", fontWeight: 500 }}>
+                                  kr {Number(b.pris).toFixed(2)}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+                        <td>{product.brukerdefinert ? "Husholdning" : "System"}</td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>

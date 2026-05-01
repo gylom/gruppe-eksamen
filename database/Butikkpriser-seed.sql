@@ -70,4 +70,9 @@ INSERT INTO Butikkpriser (vare_id, butikk_id, pris, datopris, tilbudspris, tilbu
 (29, 9, 79.90, '2026-01-01', NULL, NULL, NULL),
 
 -- KATTEFÔR (30)
-(30, 9, 49.90, '2026-01-01', 39.90, '2026-01-01', '2026-01-05');
+(30, 9, 49.90, '2026-01-01', 39.90, '2026-01-01', '2026-01-05'),
+
+-- Lagt til for å støtte en oppskrift
+(45, 2, 35.90, '2026-01-01', NULL, NULL, NULL),
+(45, 8, 36.40, '2026-01-01', NULL, NULL, NULL),
+(45, 9, 36.90, '2026-01-01', NULL, NULL, NULL);
