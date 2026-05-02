@@ -1856,6 +1856,7 @@ export default function App() {
               {sortedRecommendedRecipes.map((recipe) => (
                 <article className="mini-card" key={recipe.id}>
                   <h3>{recipe.navn}</h3>
+                  <p>{recipe.melding}</p>
                   <p>Match: {recipe.matchProsent}%</p>
                   <p className="muted">Kategori: {recipe.kategori || "Ikke valgt"}</p>
                   <p>Karakter: {recipe.karakter ?? "Ikke vurdert"}/10</p>
