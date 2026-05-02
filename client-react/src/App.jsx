@@ -576,13 +576,29 @@ export default function App() {
     );
   }
 
-  const sortedRecommendedRecipes = useMemo(() => {
-    const copy = [...recommendedRecipes];
-    if (recommendedSortMode === "rating") {
-      return copy.sort((a, b) => (b.karakter ?? 0) - (a.karakter ?? 0) || b.matchProsent - a.matchProsent);
+const sortedRecommendedRecipes = useMemo(() => {
+  const copy = [...recommendedRecipes];
+
+  return copy.sort((a, b) => {
+    if (recommendedSortMode === "match") {
+      if (a.promotert && !b.promotert) return -1;
+      if (!a.promotert && b.promotert) return 1;
+      if (a.promotert && b.promotert) return 0;
     }
-    return copy.sort((a, b) => b.matchProsent - a.matchProsent || (b.karakter ?? 0) - (a.karakter ?? 0));
-  }, [recommendedRecipes, recommendedSortMode]);
+
+    if (recommendedSortMode === "rating") {
+      return (
+        (b.karakter ?? 0) - (a.karakter ?? 0) ||
+        (b.matchProsent ?? 0) - (a.matchProsent ?? 0)
+      );
+    }
+
+    return (
+      (b.matchProsent ?? 0) - (a.matchProsent ?? 0) ||
+      (b.karakter ?? 0) - (a.karakter ?? 0)
+    );
+  });
+}, [recommendedRecipes, recommendedSortMode]);
 
   const brandOptions = [...new Set(products.map((p) => p.merke).filter(Boolean))].sort();
 

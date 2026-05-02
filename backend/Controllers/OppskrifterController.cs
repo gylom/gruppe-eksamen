@@ -257,36 +257,99 @@ public class OppskrifterController : ControllerBase
         });
     }
 
-    [HttpGet("api/oppskrifteranbefalt")]
-    public async Task<IActionResult> Recommended()
+[HttpGet("api/oppskrifteranbefalt")]
+public async Task<IActionResult> Recommended()
+{
+    var userId = GetUserId();
+    var householdId = GetHouseholdId();
+
+    if (userId == null || householdId == null)
+        return BadRequest(new { message = "Manglende bruker/husholdning." });
+
+    var visibleOwnerIds = await GetVisibleRecipeOwnerIds(userId.Value);
+    var preferenceLookup = await GetPreferenceLookup(userId.Value);
+
+    var hiddenIds = preferenceLookup
+        .Where(x => x.Value.Skjul || x.Value.Karakter == 1)
+        .Select(x => x.Key)
+        .ToList();
+
+    var availableTypeIds = await _db.Varelager
+        .Where(x => x.HusholdningId == householdId.Value && x.Kvantitet > 0)
+        .Select(x => x.Vare!.VaretypeId)
+        .Distinct()
+        .ToListAsync();
+
+    var recipes = await _db.Oppskrifter
+        .Where(x => visibleOwnerIds.Contains(x.UserId) && !hiddenIds.Contains(x.Id))
+        .Include(x => x.Kategori)
+        .Include(x => x.Ingredienser)!.ThenInclude(x => x.Varetype)
+        .ToListAsync();
+
+    var result = recipes.Select(r =>
     {
-        var userId = GetUserId();
-        var householdId = GetHouseholdId();
+        var required = r.Ingredienser.Where(i => !(i.Valgfritt ?? false)).ToList();
+        var have = required.Count(i => availableTypeIds.Contains(i.VaretypeId));
 
-        if (userId == null || householdId == null)
-            return BadRequest(new { message = "Manglende bruker/husholdning." });
-
-        var visibleOwnerIds = await GetVisibleRecipeOwnerIds(userId.Value);
-        var preferenceLookup = await GetPreferenceLookup(userId.Value);
-
-        var hiddenIds = preferenceLookup
-            .Where(x => x.Value.Skjul || x.Value.Karakter == 1)
-            .Select(x => x.Key)
+        var missing = required
+            .Where(i => !availableTypeIds.Contains(i.VaretypeId))
+            .Select(i => new
+            {
+                varetype_id = i.VaretypeId,
+                varetype = i.Varetype!.Navn,
+                kvantitet = i.Kvantitet,
+                type = i.Type,
+                valgfritt = i.Valgfritt
+            })
             .ToList();
 
-        var availableTypeIds = await _db.Varelager
-            .Where(x => x.HusholdningId == householdId.Value && x.Kvantitet > 0)
-            .Select(x => x.Vare!.VaretypeId)
-            .Distinct()
-            .ToListAsync();
+        var pref = preferenceLookup.GetValueOrDefault(r.Id);
 
-        var recipes = await _db.Oppskrifter
-            .Where(x => visibleOwnerIds.Contains(x.UserId) && !hiddenIds.Contains(x.Id))
-            .Include(x => x.Kategori)
-            .Include(x => x.Ingredienser)!.ThenInclude(x => x.Varetype)
-            .ToListAsync();
+        var matchProsent = required.Count == 0
+            ? 100
+            : (int)Math.Round((double)have / required.Count * 100);
 
-        var result = recipes.Select(r =>
+        string melding =
+            matchProsent == 100 ? "Alle ingredienser på lager" :
+            matchProsent >= 70 ? "Nesten alle ingredienser på lager" :
+            matchProsent >= 50 ? "Mangler noen ingredienser" :
+            "Du har noen ingredienser på lager";
+
+        return new
+        {
+            id = r.Id,
+            navn = r.Navn,
+            porsjoner = r.Porsjoner,
+            kategori_id = r.KategoriId,
+            kategori = r.Kategori != null ? r.Kategori.Navn : null,
+            karakter = pref?.Karakter,
+            kommentar = pref?.Kommentar,
+            skjul = pref?.Skjul ?? false,
+            melding = melding,
+            antallIngredienser = required.Count,
+            antallDuHar = have,
+            antallDuMangler = missing.Count,
+            matchProsent = matchProsent,
+            manglerKunFa = missing.Count <= 2,
+            manglendeIngredienser = missing,
+            promotert = false
+        };
+    })
+    .Where(x => x.matchProsent > 30)
+    .OrderByDescending(x => x.matchProsent)
+    .ThenByDescending(x => x.karakter ?? 0)
+    .ThenBy(x => x.antallDuMangler)
+    .ThenBy(x => x.navn)
+    .ToList();
+
+    var promotedRecipes = await _db.Oppskrifter
+        .Where(r => (r.Id == 59 || r.Id == 60) && !hiddenIds.Contains(r.Id))
+        .Include(r => r.Kategori)
+        .Include(r => r.Ingredienser)!.ThenInclude(i => i.Varetype)
+        .ToListAsync();
+
+    var promoted = promotedRecipes
+        .Select(r =>
         {
             var required = r.Ingredienser.Where(i => !(i.Valgfritt ?? false)).ToList();
             var have = required.Count(i => availableTypeIds.Contains(i.VaretypeId));
@@ -304,16 +367,7 @@ public class OppskrifterController : ControllerBase
                 .ToList();
 
             var pref = preferenceLookup.GetValueOrDefault(r.Id);
-var matchProsent = required.Count == 0
-    ? 100
-    : (int)Math.Round((double)have / required.Count * 100);
 
-string melding =
-    matchProsent == 100 ? "Alle ingredienser på lager" :
-    matchProsent >= 70 ? "Nesten alle ingredienser på lager" :
-    matchProsent >= 50 ? "Mangler noen ingredienser" :
-    "Du har noen ingredienser på lager";
-    
             return new
             {
                 id = r.Id,
@@ -324,7 +378,9 @@ string melding =
                 karakter = pref?.Karakter,
                 kommentar = pref?.Kommentar,
                 skjul = pref?.Skjul ?? false,
-                melding = melding,
+                melding = r.Id == 59
+                    ? "Tine vil du skal bruke mer av deres produkter."
+                    : "Jordbærsesongen starter.",
                 antallIngredienser = required.Count,
                 antallDuHar = have,
                 antallDuMangler = missing.Count,
@@ -332,18 +388,18 @@ string melding =
                     ? 100
                     : (int)Math.Round((double)have / required.Count * 100),
                 manglerKunFa = missing.Count <= 2,
-                manglendeIngredienser = missing
+                manglendeIngredienser = missing,
+                promotert = true
             };
         })
-        .Where(x => x.matchProsent > 30)
-        .OrderByDescending(x => x.matchProsent)
-        .ThenByDescending(x => x.karakter ?? 0)
-        .ThenBy(x => x.antallDuMangler)
-        .ThenBy(x => x.navn)
         .ToList();
 
-        return Ok(result);
-    }
+    var merged = promoted
+        .Concat(result.Where(x => x.id != 59 && x.id != 60))
+        .ToList();
+
+    return Ok(merged);
+}
 
     private async Task<Dictionary<ulong, Skjuloppskrift>> GetPreferenceLookup(ulong userId)
     {
