@@ -59,4 +59,16 @@ INSERT INTO Varer (id, varenavn, varetype_id, merke, kvantitet, maaleenhet_id, e
                                                                                         (42, 'Nøtter', 38, 'Den Lille Nøttefabrikken', 0.2, 2, '100000000042'),
                                                                                         (43, 'Kjeks', 39, 'Sætre', 0.25, 2, '100000000043'),
                                                                                         (44, 'Godteri', 40, 'Nidar', 0.3, 2, '100000000044'),
-                                                                                        (45, 'Helmelk Q - 1,75 liter', 46, 'Q-Meieriene', 1.75, 3, '7048840200979');
+                                                                                        (45, 'Helmelk Q - 1,75 liter', 46, 'Q-Meieriene', 1.75, 3, '7048840200979'),
+
+                                                                                        (46, 'Tine Seterrømme 3 dl', 51, 'Tine', 3, 5, '100000000046'),
+                                                                                        (47, 'Tine Helmelk 1 liter', 46, 'Tine', 1, 3, '100000000047'),
+                                                                                        (48, 'Fullkorn hvetemel 1kg', 53, 'Regal', 1, 2, '7044416007898'),
+                                                                                        (49, 'Salt Fint u/Jod 1kg Jozo', 54, 'Jozo', 1, 2, '100000000049'),
+                                                                                        (50, 'Tine Meierismør', 11, 'Tine', 500, 1, '100000000050'),
+                                                                                        (51, 'Malt Kanel 40g Santa-Maria', 56, 'Santa-Maria', 40, 1, '100000000051'),
+                                                                                        (52, 'Sukker 1kg Eldorado', 55, 'Eldorado', 1, 2, '100000000052'),
+                                                                                        (53, 'Husholdningssaft Original 1,5l Lerum', 52, 'Lerum', 1.5, 3, '100000000053'),
+                                                                                        (54, 'Tine Matfløte 3 dl', 50, 'Tine', 3, 5, '100000000054');
+
+                                                                                        
