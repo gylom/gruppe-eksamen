@@ -75,7 +75,6 @@ public class HusholdningController : ControllerBase
                 .AsNoTracking()
                 .Where(i => i.HusholdningId == medlemskap.HusholdningId
                     && i.RevokedAt == null
-                    && i.UsedAt == null
                     && i.ExpiresAt > now)
                 .OrderByDescending(i => i.CreatedAt)
                 .FirstOrDefaultAsync();
@@ -179,12 +178,6 @@ public class HusholdningController : ControllerBase
             return Conflict(new { message = "Invitasjonskoden er trukket tilbake." });
         }
 
-        if (invite.UsedAt != null)
-        {
-            await tx.RollbackAsync();
-            return Conflict(new { message = "Invitasjonskoden er allerede brukt." });
-        }
-
         var now = DateTime.UtcNow;
         if (invite.ExpiresAt <= now)
         {
@@ -199,9 +192,6 @@ public class HusholdningController : ControllerBase
             Rolle = "medlem"
         });
 
-        invite.UsedAt = now;
-        invite.UsedByUserId = userId.Value;
-
         try
         {
             await _db.SaveChangesAsync();
@@ -210,7 +200,7 @@ public class HusholdningController : ControllerBase
         catch (DbUpdateException)
         {
             await tx.RollbackAsync();
-            return Conflict(new { message = "Invitasjonskoden er allerede brukt." });
+            return Conflict(new { message = "Brukeren er allerede medlem av en husholdning." });
         }
 
         return Ok(new { message = "Du er nå medlem av husholdningen." });
@@ -238,8 +228,7 @@ public class HusholdningController : ControllerBase
 
         var toRevoke = await _db.HusholdningInvitasjoner
             .Where(i => i.HusholdningId == membership.HusholdningId
-                && i.RevokedAt == null
-                && i.UsedAt == null)
+                && i.RevokedAt == null)
             .ToListAsync();
 
         var revokeTime = DateTime.UtcNow;
@@ -297,8 +286,7 @@ public class HusholdningController : ControllerBase
 
         var actives = await _db.HusholdningInvitasjoner
             .Where(i => i.HusholdningId == membership.HusholdningId
-                && i.RevokedAt == null
-                && i.UsedAt == null)
+                && i.RevokedAt == null)
             .ToListAsync();
 
         if (actives.Count == 0)
