@@ -65,4 +65,13 @@ INSERT INTO Oppskrifter (id, navn, instruksjoner, porsjoner, user_id, kategori_i
 (55, 'Kattefôr servering', 'Åpne kattefôr og server til katt.', 1, 4, 6, NOW()),
 (56, 'Toalettpapir påfylling', 'Sett fram ny rull toalettpapir.', 1, 4, 3, NOW()),
 (57, 'Tannkrem klar til bruk', 'Legg fram tannkrem på badet.', 1, 4, 3, NOW()),
-(58, 'Øl og nøtter', 'Server øl sammen med nøtter.', 1, 4, 6, NOW());
+(58, 'Øl og nøtter', 'Server øl sammen med nøtter.', 1, 4, 6, NOW()),
+
+-- Oppskrifter for å demonstrere kampanje og sesong til anbefalte oppskrifter
+(59, 'Hjemmelaget rømmegrøt', '1. La rømme koke under lokk i ca. 2 minutter. 
+Dryss i halvparten av melet mens du rører hele tiden. Da vil det piple frem smør. 2. 
+Ta ut smøret med en spiseskje og hold det varmt i en liten skål, slik at du kan servere det på grøten til slutt. 
+Dryss i resten av melet og rør godt. Spe med melk under røring til grøten er jevn og passe tykk. Smak til med 
+salt like før servering. 3. Blir grøten stående en stund før servering, vil den tykne mer. Spe da med mer melk 
+til passe konsistens. Server grøten med smørøye, sukker og kanel. (ts og ss omregnet til gram)', 4, 4, 3, NOW()),
+(60, 'Jordbær med fløte', 'Vask og rens bærene. Legg i en skål og hell fløte over.', 2, 4, 5, NOW());

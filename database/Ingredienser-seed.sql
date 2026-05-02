@@ -247,4 +247,20 @@ VALUES
 
 -- 58 Øl og nøtter
 (131, 58, 37, 0.50, 3, 'ingredient', 0),
-(132, 58, 38, 0.10, 2, 'ingredient', 0);
+(132, 58, 38, 0.10, 2, 'ingredient', 0),
+
+-- 59 Hjemmelaget rømmegrøt
+(133, 59, 51, 5, 5, 'ingredient', 0),
+(134, 59, 53, 2, 5, 'ingredient', 0),
+(135, 59, 46, 5, 5, 'ingredient', 0),
+(136, 59, 54, 3, 1, 'ingredient', 1),
+(137, 59, 55, 85, 5, 'tilbehor', 1),
+(138, 59, 56, 5, 1, 'tilbehor', 1),
+(139, 59, 52, 8, 5, 'tilbehor', 1),
+(140, 59, 57, 200, 1, 'tilbehor', 1),
+(141, 59, 11, 30, 1, 'tilbehor', 1),
+
+-- 60 Jordbær og fløte
+(142, 60, 27, 200, 1, 'ingredient', 0),
+(143, 60, 50, 1, 5, 'ingredient', 0);
+

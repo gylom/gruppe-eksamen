@@ -45,4 +45,15 @@ INSERT INTO Varetyper (id, varetype, kategori_id) VALUES
                                                       (44, 'Verktøy og utstyr', 58),
                                                       (45, 'Diverse beredskap', 58),
                                                       (46, 'Helmelk', 11),
-                                                      (47, 'Lettmelk', 11);
+                                                      (47, 'Lettmelk', 11),
+                                                      (48, 'Fløte', 11),
+                                                      (49, 'Kremfløte', 11),
+                                                      (50, 'Matfløte', 11),
+                                                      (51, 'Rømme', 11),
+                                                      (52, 'Husholdningssaft', 60),
+                                                      (53, 'Hvetemel', 29),
+                                                      (54, 'Salt', 61),
+                                                      (55, 'Sukker', 29),
+                                                      (56, 'Kanel', 61),
+                                                      (57, 'Spekemat', 9);
+

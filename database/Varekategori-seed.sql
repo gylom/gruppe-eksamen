@@ -66,4 +66,8 @@ INSERT INTO Varekategori (id, kategorinavn, parent_id) VALUES
                                                            (55, 'Dyremat', NULL),
                                                            (56, 'Hund', 55),
                                                            (57, 'Katt', 55),
-                                                           (58, 'Beredskap og diverse', NULL);
+                                                           (58, 'Beredskap og diverse', NULL),
+
+                                                           (59, 'Fløte og rømme', 10),
+                                                           (60, 'Saft', 44),
+                                                           (61, 'Krydder og basisvarer', 22);
