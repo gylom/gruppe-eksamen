@@ -566,6 +566,26 @@ export default function App() {
     setOpenCommentId(null);
     setCommentDraft("");
   }
+  function formatDate(dateString) {
+    if (!dateString) return "-";
+    return new Date(dateString).toLocaleDateString("no-NO");
+  }
+
+  function getExpiryClass(dateString) {
+    if (!dateString) return "";
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const expiry = new Date(dateString);
+    expiry.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return "expiry-red";
+    if (diffDays <= 2) return "expiry-yellow";
+    return "";
+  }
   function renderRecipeActions(recipe, hidden = false) {
     const hasComment = !!recipe.kommentar?.trim();
     const isCommentOpen = openCommentId === recipe.id;
@@ -1457,6 +1477,8 @@ export default function App() {
                     <th>Minimum</th>
                     <th>Beredskap</th>
                     <th>Plasseringer</th>
+                    <th>Kjøpsdato</th>
+                    <th>Best før dato</th>
                     <th>Ta ut</th>
                   </tr>
                 </thead>
@@ -1471,6 +1493,10 @@ export default function App() {
                       <td>{row.minimumslager ?? 0}</td>
                       <td>{row.beredskapslager ? "Ja" : "Nei"}</td>
                       <td>{row.plasseringer?.length ? row.plasseringer.join(", ") : "-"}</td>
+                      <td>{row.varer?.[0]?.kjopsdato ? formatDate(row.varer[0].kjopsdato) : "-"}</td>
+                      <td className={getExpiryClass(row.varer?.[0]?.bestfordato)}>
+                        {row.varer?.[0]?.bestfordato ? formatDate(row.varer[0].bestfordato) : "-"}
+                      </td>
                       <td>
                         {row.varer?.length > 0 ? (
                           <div className="stack">
