@@ -3,4 +3,6 @@ INSERT INTO Maaleenheter (id, enhet, type) VALUES
                                                (2, 'kg', 'vekt'),
                                                (3, 'liter', 'volum'),
                                                (4, 'stk', 'antall'),
-                                               (5, 'dl', 'volum');
+                                               (5, 'dl', 'volum'),
+                                               (6, 'ts', 'volum'),
+                                               (7, 'ss', 'volum');
