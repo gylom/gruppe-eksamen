@@ -31,6 +31,8 @@ export default function App() {
   const [recommendedRecipes, setRecommendedRecipes] = useState([]);
   const [hiddenRecipes, setHiddenRecipes] = useState([]);
   const [recommendedSortMode, setRecommendedSortMode] = useState("match");
+  const [openCommentId, setOpenCommentId] = useState(null);
+  const [commentDraft, setCommentDraft] = useState("");
 
   const [household, setHousehold] = useState(null);
   const [members, setMembers] = useState([]);
@@ -99,7 +101,8 @@ export default function App() {
   const [placementForm, setPlacementForm] = useState({
     plassering: ""
   });
-
+  const [editingPlacementId, setEditingPlacementId] = useState(null);
+  const [editingPlacementName, setEditingPlacementName] = useState("");
   const [shoppingForm, setShoppingForm] = useState({
     varetypeId: "",
     vareId: "",
@@ -547,11 +550,30 @@ export default function App() {
       showError(err.response?.data?.message || "Kunne ikke slette oppskriften.");
     }
   }
+  function toggleComment(recipe) {
+    if (openCommentId === recipe.id) {
+      setOpenCommentId(null);
+      setCommentDraft("");
+      return;
+    }
 
+    setOpenCommentId(recipe.id);
+    setCommentDraft(recipe.kommentar || "");
+  }
+
+  async function saveComment(recipeId) {
+    await saveRecipePreference(recipeId, { kommentar: commentDraft });
+    setOpenCommentId(null);
+    setCommentDraft("");
+  }
   function renderRecipeActions(recipe, hidden = false) {
+    const hasComment = !!recipe.kommentar?.trim();
+    const isCommentOpen = openCommentId === recipe.id;
+
     return (
       <div className="recipe-tools">
         <p className="muted">Karakter: {recipe.karakter ?? "Ikke vurdert"}/10</p>
+
         <div className="rating-row">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => (
             <button
@@ -564,41 +586,81 @@ export default function App() {
             </button>
           ))}
         </div>
+
         <div className="actions">
           {hidden ? (
             <button onClick={() => unhideRecipe(recipe.id)}>Vis igjen</button>
           ) : (
             <button onClick={() => hideRecipe(recipe.id)}>Skjul</button>
           )}
+
           <button onClick={() => deleteRecipe(recipe.id)}>Slett</button>
+
+          <button
+            className={hasComment ? "secondary active" : "secondary"}
+            onClick={() => toggleComment(recipe)}
+            title={hasComment ? recipe.kommentar : "Legg til kommentar"}
+          >
+            💬
+          </button>
         </div>
+
+        {isCommentOpen && (
+          <div style={{ marginTop: "0.75rem" }}>
+            <textarea
+              rows={3}
+              value={commentDraft}
+              onChange={(e) => setCommentDraft(e.target.value)}
+              placeholder="Skriv kommentar..."
+              style={{ width: "100%", resize: "vertical" }}
+            />
+            <div
+              style={{
+                display: "flex",
+                gap: "0.5rem",
+                marginTop: "0.5rem"
+              }}
+            >
+              <button onClick={() => saveComment(recipe.id)}>Lagre</button>
+              <button
+                className="secondary"
+                onClick={() => {
+                  setOpenCommentId(null);
+                  setCommentDraft("");
+                }}
+              >
+                Avbryt
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
-const sortedRecommendedRecipes = useMemo(() => {
-  const copy = [...recommendedRecipes];
+  const sortedRecommendedRecipes = useMemo(() => {
+    const copy = [...recommendedRecipes];
 
-  return copy.sort((a, b) => {
-    if (recommendedSortMode === "match") {
-      if (a.promotert && !b.promotert) return -1;
-      if (!a.promotert && b.promotert) return 1;
-      if (a.promotert && b.promotert) return 0;
-    }
+    return copy.sort((a, b) => {
+      if (recommendedSortMode === "match") {
+        if (a.promotert && !b.promotert) return -1;
+        if (!a.promotert && b.promotert) return 1;
+        if (a.promotert && b.promotert) return 0;
+      }
 
-    if (recommendedSortMode === "rating") {
+      if (recommendedSortMode === "rating") {
+        return (
+          (b.karakter ?? 0) - (a.karakter ?? 0) ||
+          (b.matchProsent ?? 0) - (a.matchProsent ?? 0)
+        );
+      }
+
       return (
-        (b.karakter ?? 0) - (a.karakter ?? 0) ||
-        (b.matchProsent ?? 0) - (a.matchProsent ?? 0)
+        (b.matchProsent ?? 0) - (a.matchProsent ?? 0) ||
+        (b.karakter ?? 0) - (a.karakter ?? 0)
       );
-    }
-
-    return (
-      (b.matchProsent ?? 0) - (a.matchProsent ?? 0) ||
-      (b.karakter ?? 0) - (a.karakter ?? 0)
-    );
-  });
-}, [recommendedRecipes, recommendedSortMode]);
+    });
+  }, [recommendedRecipes, recommendedSortMode]);
 
   const brandOptions = [...new Set(products.map((p) => p.merke).filter(Boolean))].sort();
 
@@ -802,7 +864,29 @@ const sortedRecommendedRecipes = useMemo(() => {
       showError(err.response?.data?.message || "Kunne ikke slette plassering.");
     }
   }
+  async function updatePlacement(placementId) {
+    try {
+      if (!editingPlacementName.trim()) {
+        showError("Skriv inn navn på plasseringen.");
+        return;
+      }
 
+      await api.put(
+        `/husholdning/plassering/${placementId}`,
+        { plassering: editingPlacementName.trim() },
+        { headers: authHeaders }
+      );
+
+      showMessage("Plassering oppdatert.");
+      setEditingPlacementId(null);
+      setEditingPlacementName("");
+      await loadPlacements();
+      await loadHousehold();
+    } catch (err) {
+      console.error(err);
+      showError(err.response?.data?.message || "Kunne ikke oppdatere plassering.");
+    }
+  }
   async function loadShoppingList() {
     try {
       const res = await api.get("/handleliste", { headers: authHeaders });
@@ -1248,13 +1332,54 @@ const sortedRecommendedRecipes = useMemo(() => {
               </div>
 
               <div className="cards-grid">
-                {placements.map((placement) => (
-                  <article className="mini-card" key={placement.id}>
-                    <h3>{placement.plassering}</h3>
-                    <p>ID: {placement.id}</p>
-                    <button onClick={() => deletePlacement(placement.id)}>Slett</button>
-                  </article>
-                ))}
+                {placements.map((placement) => {
+                  const isEditing = editingPlacementId === placement.id;
+
+                  return (
+                    <article className="mini-card" key={placement.id}>
+                      <h3>{placement.plassering}</h3>
+                      <p>ID: {placement.id}</p>
+
+                      <div className="actions">
+                        <button
+                          className="secondary"
+                          onClick={() => {
+                            setEditingPlacementId(placement.id);
+                            setEditingPlacementName(placement.plassering);
+                          }}
+                        >
+                          Endre
+                        </button>
+
+                        <button onClick={() => deletePlacement(placement.id)}>Slett</button>
+                      </div>
+
+                      {isEditing && (
+                        <div style={{ marginTop: "0.75rem" }}>
+                          <input
+                            type="text"
+                            value={editingPlacementName}
+                            onChange={(e) => setEditingPlacementName(e.target.value)}
+                            placeholder="Nytt navn"
+                          />
+
+                          <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
+                            <button onClick={() => updatePlacement(placement.id)}>Lagre</button>
+                            <button
+                              className="secondary"
+                              onClick={() => {
+                                setEditingPlacementId(null);
+                                setEditingPlacementName("");
+                              }}
+                            >
+                              Avbryt
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
               </div>
             </section>
 
