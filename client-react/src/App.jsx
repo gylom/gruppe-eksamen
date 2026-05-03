@@ -356,6 +356,23 @@ export default function App() {
       );
     }
   }
+  async function updateInventoryRow(item, newPlacementId) {
+    try {
+      await api.put(
+        `/varelager/${item.id}`,
+        {
+          plasseringId: Number(newPlacementId)
+        },
+        { headers: authHeaders }
+      );
+
+      showMessage("Plassering oppdatert.");
+      await loadInventory();
+    } catch (error) {
+      console.error(error);
+      showError("Kunne ikke oppdatere plassering.");
+    }
+  }
 
   async function takeFromInventory(itemId) {
     const quantityTaken = prompt("Hvor mye vil du ta ut fra denne varen?", "1");
@@ -1515,7 +1532,24 @@ export default function App() {
                       </td>
                       <td>{row.minimumslager ?? 0}</td>
                       <td>{row.beredskapslager ? "Ja" : "Nei"}</td>
-                      <td>{row.plasseringer?.length ? row.plasseringer.join(", ") : "-"}</td>
+                      <td>
+                        <select
+                          value={row.varer?.[0]?.plassering_id ? String(row.varer[0].plassering_id) : ""}
+                          onChange={(e) => updateInventoryRow(row.varer[0], e.target.value)}
+                          style={{
+                            width: "120px",
+                            minWidth: "120px",
+                            padding: "0.35rem 0.5rem"
+                          }}
+                        >
+                          <option value="">Velg plassering</option>
+                          {placements.map((placement) => (
+                            <option key={placement.id} value={String(placement.id)}>
+                              {placement.plassering}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
                       <td>{row.varer?.[0]?.kjopsdato ? formatDate(row.varer[0].kjopsdato) : "-"}</td>
                       <td className={getExpiryClass(row.varer?.[0]?.bestfordato)}>
                         {row.varer?.[0]?.bestfordato ? formatDate(row.varer[0].bestfordato) : "-"}
