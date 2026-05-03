@@ -319,6 +319,7 @@ public async Task<IActionResult> Recommended()
         {
             id = r.Id,
             navn = r.Navn,
+            bilde = r.Bilde,
             porsjoner = r.Porsjoner,
             kategori_id = r.KategoriId,
             kategori = r.Kategori != null ? r.Kategori.Navn : null,
@@ -372,6 +373,7 @@ public async Task<IActionResult> Recommended()
             {
                 id = r.Id,
                 navn = r.Navn,
+                bilde = r.Bilde,
                 porsjoner = r.Porsjoner,
                 kategori_id = r.KategoriId,
                 kategori = r.Kategori != null ? r.Kategori.Navn : null,
