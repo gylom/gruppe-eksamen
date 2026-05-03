@@ -48,6 +48,11 @@ export default function App() {
   const [mainCategoryFilter, setMainCategoryFilter] = useState("");
   const [storeFilter, setStoreFilter] = useState("");
 
+  const [consumptionFromDate, setConsumptionFromDate] = useState("");
+  const [consumptionToDate, setConsumptionToDate] = useState("");
+  const [consumptionProductFilter, setConsumptionProductFilter] = useState("");
+  const [consumptionTypeFilter, setConsumptionTypeFilter] = useState("");
+
   const [newProductForm, setNewProductForm] = useState({
     varenavn: "",
     varetypeId: "",
@@ -61,7 +66,8 @@ export default function App() {
     productId: "",
     quantity: "1",
     measurementUnitId: "",
-    purchaseDate: "",
+    kjopsdato: "",
+    purchaseDate: new Date().toISOString().split("T")[0],
     bestBeforeDate: "",
     placementId: ""
   });
@@ -318,6 +324,7 @@ export default function App() {
           ? `${inventoryForm.purchaseDate}T00:00:00`
           : null,
         bestfordato: inventoryForm.bestBeforeDate || null,
+        pris: inventoryForm.pris ? Number(inventoryForm.pris) : null,
         plasseringId: inventoryForm.placementId
           ? Number(inventoryForm.placementId)
           : null
@@ -693,6 +700,22 @@ export default function App() {
       products.flatMap((p) => (p.butikker || []).map((b) => b.butikk)).filter(Boolean)
     ),
   ].sort();
+
+  const consumptionProductOptions = [...new Set(consumptionRows.map((x) => x.varenavn).filter(Boolean))].sort();
+  const consumptionTypeOptions = [...new Set(consumptionRows.map((x) => x.varetype).filter(Boolean))].sort();
+
+  const filteredConsumption = consumptionRows.filter((item) => {
+    if (consumptionFromDate && item.forbruksdato < consumptionFromDate) return false;
+    if (consumptionToDate && item.forbruksdato > consumptionToDate) return false;
+    if (consumptionProductFilter && item.varenavn !== consumptionProductFilter) return false;
+    if (consumptionTypeFilter && item.varetype !== consumptionTypeFilter) return false;
+    return true;
+  });
+
+  const consumptionTotal = filteredConsumption.reduce(
+    (sum, item) => sum + Number(item.innkjopspris || 0),
+    0
+  );
 
   async function loadHousehold() {
     try {
@@ -1588,7 +1611,22 @@ export default function App() {
                   }
                 />
               </label>
-
+              <label>
+                Innkjøpspris
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={inventoryForm.pris}
+                  onChange={(e) =>
+                    setInventoryForm((prev) => ({
+                      ...prev,
+                      pris: e.target.value
+                    }))
+                  }
+                  placeholder="f.eks. 39.90"
+                />
+              </label>
               <label>
                 Plassering
                 <select
@@ -1728,87 +1766,66 @@ export default function App() {
             <div className="section-head">
               <div>
                 <h2>8. Forbruk</h2>
-                <p>Registrer hva som brukes, og få oppdatert lager og oppskriftsmatch.</p>
+                <p>Se hva som er brukt i husholdningen, filtrer på periode og få oversikt over kostnad.</p>
               </div>
+              <button onClick={loadConsumption}>Oppdater forbruk</button>
             </div>
 
-            <div className="grid four">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                gap: "0.75rem",
+                marginBottom: "1rem"
+              }}
+            >
               <label>
-                Fra varelager-rad
-                <select
-                  value={consumptionForm.varelagerId}
-                  onChange={(e) =>
-                    setConsumptionForm({ ...consumptionForm, varelagerId: e.target.value })
-                  }
-                >
-                  <option value="">Velg varelager-rad</option>
-                  {inventory.flatMap((row) =>
-                    (row.varer || []).map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {row.varenavn} (lager-id {item.id})
-                      </option>
-                    ))
-                  )}
-                </select>
-              </label>
-
-              <label>
-                Eller vare
-                <select
-                  value={consumptionForm.vareId}
-                  onChange={(e) => setConsumptionForm({ ...consumptionForm, vareId: e.target.value })}
-                >
-                  <option value="">Velg vare</option>
-                  {products.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.varenavn}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                Mengde
-                <input
-                  value={consumptionForm.kvantitet}
-                  onChange={(e) =>
-                    setConsumptionForm({ ...consumptionForm, kvantitet: e.target.value })
-                  }
-                />
-              </label>
-
-              <label>
-                Måleenhet
-                <select
-                  value={consumptionForm.maaleenhetId}
-                  onChange={(e) =>
-                    setConsumptionForm({ ...consumptionForm, maaleenhetId: e.target.value })
-                  }
-                >
-                  <option value="">Ingen</option>
-                  {units.map((unit) => (
-                    <option key={unit.id} value={unit.id}>
-                      {unit.enhet}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                Forbruksdato
+                Fra dato
                 <input
                   type="date"
-                  value={consumptionForm.forbruksdato}
-                  onChange={(e) =>
-                    setConsumptionForm({ ...consumptionForm, forbruksdato: e.target.value })
-                  }
+                  value={consumptionFromDate}
+                  onChange={(e) => setConsumptionFromDate(e.target.value)}
                 />
               </label>
-            </div>
 
-            <div className="actions">
-              <button onClick={createConsumption}>Registrer forbruk</button>
-              <button onClick={loadConsumption}>Oppdater forbruk</button>
+              <label>
+                Til dato
+                <input
+                  type="date"
+                  value={consumptionToDate}
+                  onChange={(e) => setConsumptionToDate(e.target.value)}
+                />
+              </label>
+
+              <label>
+                Varenavn
+                <select
+                  value={consumptionProductFilter}
+                  onChange={(e) => setConsumptionProductFilter(e.target.value)}
+                >
+                  <option value="">Alle</option>
+                  {consumptionProductOptions.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                Varetype
+                <select
+                  value={consumptionTypeFilter}
+                  onChange={(e) => setConsumptionTypeFilter(e.target.value)}
+                >
+                  <option value="">Alle</option>
+                  {consumptionTypeOptions.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
 
             <div className="table-wrap">
@@ -1816,15 +1833,17 @@ export default function App() {
                 <thead>
                   <tr>
                     <th>Dato</th>
-                    <th>Vare</th>
+                    <th>Varenavn</th>
                     <th>Varetype</th>
                     <th>Mengde</th>
                     <th>Måleenhet</th>
+                    <th>Innkjøpspris</th>
                     <th>Bruker</th>
                   </tr>
                 </thead>
+
                 <tbody>
-                  {consumptionRows.map((row) => (
+                  {filteredConsumption.map((row) => (
                     <tr key={row.id}>
                       <td>
                         {row.forbruksdato ? new Date(row.forbruksdato).toLocaleDateString() : "-"}
@@ -1833,10 +1852,33 @@ export default function App() {
                       <td>{row.varetype}</td>
                       <td>{row.kvantitet ?? "-"}</td>
                       <td>{row.maaleenhet || "-"}</td>
+                      <td>kr {Number(row.innkjopspris || 0).toFixed(2)}</td>
                       <td>{row.brukernavn}</td>
                     </tr>
                   ))}
                 </tbody>
+
+                <tfoot>
+                  <tr>
+                    <td colSpan={5}></td>
+                    <td
+                      style={{
+                        fontWeight: 700,
+                        borderTop: "2px solid #cbd5e1"
+                      }}
+                    >
+                      kr {consumptionTotal.toFixed(2)}
+                    </td>
+                    <td
+                      style={{
+                        fontWeight: 700,
+                        borderTop: "2px solid #cbd5e1"
+                      }}
+                    >
+                      Total
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </section>

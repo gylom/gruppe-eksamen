@@ -177,19 +177,52 @@ public class VarelagerController : ControllerBase
     [HttpPost("{id:long}/taut")]
     public async Task<IActionResult> TakeOut(ulong id, TakeFromInventoryRequest request)
     {
-        var householdId = GetHouseholdId();
-        if (householdId == null) return BadRequest(new { message = "Brukeren er ikke medlem av husholdning." });
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
 
-        var row = await _db.Varelager.FirstOrDefaultAsync(x => x.Id == id && x.HusholdningId == householdId.Value);
-        if (row == null) return NotFound(new { message = "Varelager-rad ikke funnet." });
-        if (request.Kvantitet <= 0) return BadRequest(new { message = "Kvantitet må være større enn 0." });
+        var householdId = GetHouseholdId();
+        if (householdId == null)
+            return BadRequest(new { message = "Brukeren er ikke medlem av husholdning." });
+
+        var row = await _db.Varelager
+            .FirstOrDefaultAsync(x => x.Id == id && x.HusholdningId == householdId.Value);
+
+        if (row == null)
+            return NotFound(new { message = "Varelager-rad ikke funnet." });
+
+        if (request.Kvantitet <= 0)
+            return BadRequest(new { message = "Kvantitet må være større enn 0." });
+
+        if (request.Kvantitet > row.Kvantitet)
+            return BadRequest(new { message = "Kan ikke ta ut mer enn tilgjengelig mengde." });
+
+        // Beregner prisen på forbrukt andel av vare
+        if (row.Kvantitet <= 0)
+            return BadRequest(new { message = "Varen har ingen tilgjengelig mengde." });
+        var andel = request.Kvantitet / row.Kvantitet;
+        var uttakspris = Math.Round((row.Pris ?? 0) * andel, 2);
+        // Legger til rad i forbrukstabellen
+        _db.Forbruk.Add(new ForbrukRad
+        {
+            UserId = userId.Value,
+            VareId = row.VareId,
+            Forbruksdato = DateTime.Now,
+            Innkjopspris = uttakspris,
+            MaaleenhetId = row.MaaleenhetId,
+            Kvantitet = request.Kvantitet
+        });
 
         row.Kvantitet -= request.Kvantitet;
+        row.Pris = (row.Pris ?? 0) - uttakspris;
+        if (row.Kvantitet < 0) row.Kvantitet = 0;
+        if (row.Pris < 0) row.Pris = 0;
+
         if (row.Kvantitet <= 0)
             _db.Varelager.Remove(row);
 
         await _db.SaveChangesAsync();
-        return Ok(new { message = "Vare tatt ut av varelager." });
+
+        return Ok(new { message = "Vare tatt ut av varelager og logget som forbruk." });
     }
 
     [HttpPost("innstillinger")]
@@ -220,6 +253,12 @@ public class VarelagerController : ControllerBase
 
         await _db.SaveChangesAsync();
         return Ok(new { message = "Husholdningsinnstillinger lagret." });
+    }
+
+    private ulong? GetUserId()
+    {
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return ulong.TryParse(claim, out var id) ? id : null;
     }
 
     private ulong? GetHouseholdId()
