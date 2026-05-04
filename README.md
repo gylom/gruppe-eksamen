@@ -10,7 +10,7 @@ Eksamen Gokstad Akademiet
 - Node.js + npm
 
 ## Windows
-### Open for example Rider or VSCode terminal and paste commands:
+### Open  Rider, VSCode or other IDE terminal and paste commands:
 ```bash
 npm install
 npm run start:win
