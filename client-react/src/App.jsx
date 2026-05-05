@@ -3,7 +3,7 @@ import axios from "axios";
 import "./App.css";
 
 const api = axios.create({
-  baseURL: "http://localhost:5188/api"
+  baseURL: import.meta.env.VITE_API_BASE_URL || "/api"
 });
 
 export default function App() {
