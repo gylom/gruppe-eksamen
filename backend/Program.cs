@@ -9,6 +9,19 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var mysqlHost = Environment.GetEnvironmentVariable("MYSQLHOST");
+if (!string.IsNullOrEmpty(mysqlHost))
+{
+    connectionString =
+        $"Server={mysqlHost};" +
+        $"Port={Environment.GetEnvironmentVariable("MYSQLPORT") ?? "3306"};" +
+        $"Database={Environment.GetEnvironmentVariable("MYSQLDATABASE") ?? "railway"};" +
+        $"User={Environment.GetEnvironmentVariable("MYSQLUSER") ?? "root"};" +
+        $"Password={Environment.GetEnvironmentVariable("MYSQLPASSWORD") ?? string.Empty};" +
+        "CharSet=utf8mb4;";
+}
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -37,7 +50,7 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
+        connectionString,
         new MySqlServerVersion(new Version(8, 4, 8))));
 
 builder.Services.AddScoped<IPasswordHasher<Bruker>, PasswordHasher<Bruker>>();
@@ -67,14 +80,15 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
+
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 app.UseCors("react");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapFallbackToFile("index.html");
 app.Run();
