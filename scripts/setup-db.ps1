@@ -48,8 +48,18 @@ if (-not $mysqlReady) {
 }
 
 Write-Host "Verifying MySQL login..."
-docker exec matlager-mysql mysql -h 127.0.0.1 -uroot -proot -e "SELECT 1;" | Out-Null
-if ($LASTEXITCODE -ne 0) {
+$ErrorActionPreference = "Continue"
+$loginReady = $false
+for ($i = 0; $i -lt 60; $i++) {
+    docker exec matlager-mysql sh -c "mysql -h 127.0.0.1 -uroot -proot -e 'SELECT 1;' >/dev/null 2>&1"
+    if ($LASTEXITCODE -eq 0) {
+        $loginReady = $true
+        break
+    }
+    Start-Sleep -Seconds 2
+}
+$ErrorActionPreference = "Stop"
+if (-not $loginReady) {
     docker logs matlager-mysql
     throw "Could not authenticate to MySQL as root."
 }
