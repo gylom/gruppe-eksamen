@@ -6,12 +6,19 @@
     "db:down": "docker compose down",
     "db:reset:win": "powershell -ExecutionPolicy Bypass -File ./scripts/setup-db.ps1",
     "db:reset:linux": "bash ./scripts/setup-db.sh",
+
+    "frontend:install": "npm install --prefix frontend",
+    "backend:install": "cd backend && dotnet restore",
+    "setup": "npm run frontend:install && npm run backend:install",
+
     "backend": "cd backend && dotnet run",
     "frontend": "cd frontend && npm run dev",
     "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+
     "build": "npm run build --prefix frontend && node ./scripts/copy-frontend-to-wwwroot.mjs",
-    "start:win": "npm run db:reset:win && npm run dev",
-    "start:linux": "npm run db:reset:linux && npm run dev"
+
+    "start:win": "npm run setup && npm run db:reset:win && npm run dev",
+    "start:linux": "npm run setup && npm run db:reset:linux && npm run dev"
   },
   "devDependencies": {
     "concurrently": "^9.0.1"
